@@ -157,13 +157,13 @@ deny   run arbitrary code in the page
 deny   open the saved login as a file:// page
 deny   read the saved login with the Read tool
 deny   read the saved login from the shell
-deny   fetch a proxied PDF with curl, outside the metered browser
+deny   fetch a proxied PDF with curl, outside the counted browser
 deny   read raw request headers (the session cookie)
 ask    send data to a collector site from the logged-in browser
 ask    open another publisher through the proxy in a new tab
 deny   run the library sign-in itself
 ask    first page after the batch grew from 2 to 42 papers
-deny   page loads stop after the batch budget
+deny   a page load past the batch budget
 ```
 
 ## Limits, and why they are low
