@@ -8,10 +8,11 @@ import shutil
 import sys
 import tempfile
 import unittest
+import urllib.parse
 from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from lit_fetch_ladder import cli, fetch, net, proxify, resolve  # noqa: E402
+from lit_fetch_ladder import cli, discover, fetch, net, proxify, resolve  # noqa: E402
 
 SUFFIX = "proxy.example.edu"
 CFG = {"email": "me@example.org", "mode": "ezproxy-host", "suffix": SUFFIX}
@@ -81,7 +82,7 @@ TABLE = {
 }
 
 
-def fake_landing(doi, email):
+def fake_landing(doi):
     return "https://www.publisher-x.com/doi/%s" % doi, None
 
 
@@ -176,6 +177,63 @@ class Mark(Base):
         with mock.patch.object(fetch, "openalex_abstract", return_value="An abstract."):
             row = fetch.mark("b1", self.tmp, "10.1/paywalled", "ABSTRACT_ONLY", email="me@example.org")
         self.assertEqual(row["abstract"], "An abstract.")
+
+
+class _Resp:
+    """A stand-in HTTP response: JSON for the APIs, and the request URL as the final address."""
+    def __init__(self, url):
+        self.url = url
+
+    def read(self):
+        return b'{"results": []}'
+
+    def geturl(self):
+        return self.url
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class Privacy(unittest.TestCase):
+    """The contact email goes only to OpenAlex and Unpaywall, in the query parameter they ask
+    for. Every other request (doi.org, open-access hosts) names the tool and nothing else."""
+
+    def setUp(self):
+        self.sent = []
+
+        def fake_urlopen(req, timeout=None):
+            self.sent.append((req.full_url, dict(req.header_items())))
+            return _Resp(req.full_url)
+        p = mock.patch("urllib.request.urlopen", side_effect=fake_urlopen)
+        p.start()
+        self.addCleanup(p.stop)
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+
+    def test_email_reaches_only_the_two_apis_and_never_a_header(self):
+        email = "someone@example.org"
+        discover.search("q", email, limit=1)
+        discover.refs_of("10.1/x", email)
+        resolve.title_to_doi("a title", email)
+        resolve.from_unpaywall("10.1/x", email)
+        resolve.from_openalex("10.1/x", email)
+        fetch.openalex_abstract("10.1/x", email)
+        resolve.download("https://repo.example/x.pdf", self.tmp)
+        proxify.landing_url("10.1/x")
+        enc = urllib.parse.quote(email)
+        for url, headers in self.sent:
+            self.assertNotIn(email, " ".join(headers.values()), url)
+            self.assertNotIn("@", headers.get("User-agent", ""), url)
+            if email in url or enc in url:
+                self.assertIn(urllib.parse.urlsplit(url).hostname, ("api.openalex.org", "api.unpaywall.org"), url)
+        hosts = {urllib.parse.urlsplit(u).hostname for u, _ in self.sent}
+        self.assertTrue({"repo.example", "doi.org", "api.openalex.org", "api.unpaywall.org"} <= hosts, hosts)
+
+    def test_user_agent_names_the_tool_only(self):
+        self.assertEqual(net.USER_AGENT, "lit-fetch-ladder/0.1.0")
 
 
 class Cli(unittest.TestCase):

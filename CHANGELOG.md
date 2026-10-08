@@ -10,11 +10,14 @@ First release.
   credentials and one carrying a saved library login (EZproxy hostname form, or none for an entitled
   network).
 - Guard hook: denies code-execution, cookie, storage, raw-network and upload tools; asks before page
-  interaction; requires a batch approval for the logged-in browser and again when the batch grows;
+  interaction, and in the logged-in browser charges a click or key press that opens a page or a
+  tab to the page budget (refunded when it opens nothing); requires a batch approval for the logged-in browser and again when the batch grows;
   asks before unapproved sites; per-paper budget, 20 loads per burst, 60 per 24 hours; protects the
   saved login and its own state; blocks proxied addresses outside the browser and the agent running
   the sign-in.
 - Login keeps only the proxy's cookies.
+- The contact email goes only to OpenAlex and Unpaywall, in the parameter each asks for. Every other
+  request (doi.org, open-access hosts) names the tool and nothing else.
 - Batch approval names every site (registrable domain) the logged-in browser will open, with paper
   counts. Growth asks again: more papers, or a new site. A site reached by a redirect is not trusted
   until the user approves it.

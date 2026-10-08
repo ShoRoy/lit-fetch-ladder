@@ -18,7 +18,7 @@ FOUND, NO_OA, UNRESOLVED, ERROR = 0, 3, 4, 2
 def title_to_doi(title, email):
     """Resolve a free-text title to a DOI. Returns (doi, candidates, error)."""
     q = urllib.parse.urlencode({"search": title, "per_page": 3, "mailto": email})
-    js, err = net.get("https://api.openalex.org/works?" + q, email)
+    js, err = net.get("https://api.openalex.org/works?" + q)
     if err:
         return None, [], err
     cands = [{"title": w.get("title"), "doi": net.norm_doi(w.get("doi")), "year": w.get("publication_year")}
@@ -33,7 +33,7 @@ def _loc(pdf, landing, version, license_, host, source):
 
 def from_unpaywall(doi, email):
     js, err = net.get("https://api.unpaywall.org/v2/%s?email=%s"
-                      % (urllib.parse.quote(doi), urllib.parse.quote(email)), email)
+                      % (urllib.parse.quote(doi), urllib.parse.quote(email)))
     if err:
         return None, [], err
     meta = {"title": js.get("title"), "year": js.get("year"),
@@ -46,7 +46,7 @@ def from_unpaywall(doi, email):
 
 def from_openalex(doi, email):
     js, err = net.get("https://api.openalex.org/works/https://doi.org/%s?mailto=%s"
-                      % (urllib.parse.quote(doi), urllib.parse.quote(email)), email)
+                      % (urllib.parse.quote(doi), urllib.parse.quote(email)))
     if err:
         return None, [], err
     oa = js.get("open_access") or {}
@@ -70,11 +70,11 @@ def _rank(locs):
     return uniq
 
 
-def download(url, outdir, email):
+def download(url, outdir):
     """Fetch one PDF. Returns (path, warning). The magic-byte check catches the
     HTML landing or challenge pages that many 'PDF' links actually return."""
     os.makedirs(outdir, exist_ok=True)
-    data, err = net.get(url, email, want="bytes")
+    data, err = net.get(url, want="bytes")
     if err:
         return None, err
     is_pdf = data[:5] == b"%PDF-"
@@ -110,7 +110,7 @@ def resolve(email, doi=None, title=None, download_dir=None):
     if download_dir and locs:
         target = next((c for c in locs if c["pdf"]), None)
         if target:
-            path, warn = download(target["pdf"], download_dir, email)
+            path, warn = download(target["pdf"], download_dir)
             result["downloaded"] = {"path": path, "url": target["pdf"], "warning": warn}
         else:
             result["downloaded"] = {"path": None, "warning": "no direct PDF link among open copies; landing pages only"}

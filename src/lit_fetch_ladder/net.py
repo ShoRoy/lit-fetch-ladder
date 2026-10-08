@@ -4,11 +4,16 @@ import os
 import urllib.error
 import urllib.request
 
+from . import __version__
+
 TIMEOUT = 25
+# Every request names the tool and nothing else. The contact email is not in it: only the
+# OpenAlex and Unpaywall API calls carry it, in the query parameter those services ask for.
+USER_AGENT = "lit-fetch-ladder/%s" % __version__
 
 
 def contact_email(explicit=None):
-    """The address sent to OpenAlex/Unpaywall as the polite-pool contact.
+    """The address sent to OpenAlex and Unpaywall, and only to them.
 
     Unpaywall refuses requests without one, so a missing address is an error,
     never a silent default.
@@ -16,14 +21,14 @@ def contact_email(explicit=None):
     email = (explicit or os.environ.get("LFL_EMAIL") or "").strip()
     if not email or "@" not in email:
         raise SystemExit("error: set a contact email with --email or LFL_EMAIL "
-                         "(OpenAlex and Unpaywall ask for one; it is sent nowhere else)")
+                         "(OpenAlex and Unpaywall ask for one; it is sent only to them)")
     return email
 
 
-def get(url, email, want="json"):
+def get(url, want="json"):
     """GET a URL. Returns (payload, None) or (None, error_string)."""
     req = urllib.request.Request(url, headers={
-        "User-Agent": "lit-fetch-ladder/0.1 (mailto:%s)" % email,
+        "User-Agent": USER_AGENT,
         "Accept": "application/json" if want == "json" else "*/*",
     })
     try:

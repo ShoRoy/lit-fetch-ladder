@@ -100,7 +100,7 @@ def main(argv=None):
         suffix = proxify.suffix_from(a.proxy_suffix)
         src, note = a.url, None
         if a.doi:
-            src, note = proxify.landing_url(a.doi, email)
+            src, note = proxify.landing_url(a.doi)
         if not src:
             print("error: could not resolve the DOI (%s)" % note, file=sys.stderr)
             return 2

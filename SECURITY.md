@@ -15,6 +15,9 @@ them that the README does not describe:
   hide it can slip past it. The file tools (Read, Edit, Grep, Glob) are checked by resolved path.
 - A redirect inside one page load cannot be stopped. The site it lands on is not trusted: the next
   navigation there asks the user.
+- A page load is counted when the agent navigates, or when a click or key press in the logged-in
+  browser opens a page or a tab. A page that loads another page by itself, with no navigation or
+  click from the agent, is not counted.
 - A site the user approves is remembered as a companion of the site the browser came from and is
   allowed in later batches that include that site (listed in their approval prompt). An approval given
   by mistake persists until forgotten with `/lit-fetch-ladder:sites`.

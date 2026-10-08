@@ -68,7 +68,7 @@ def load(mpath, batch):
 def auth_url_for(doi, cfg):
     """Where the library browser should open this paper: the publisher landing page,
     rewritten to the proxy form unless the network itself is entitled (mode none)."""
-    landing, _ = proxify.landing_url(doi, cfg["email"])
+    landing, _ = proxify.landing_url(doi)
     if not landing or urllib.parse.urlsplit(landing).hostname in (None, "doi.org"):
         return None
     return proxify.proxify_url(landing, cfg["suffix"]) if cfg["mode"] == "ezproxy-host" else landing
@@ -176,7 +176,7 @@ def report(manifest, mpath, pages_per_paper=DEFAULT_PAGES_PER_PAPER):
 
 def openalex_abstract(doi, email):
     js, err = net.get("https://api.openalex.org/works/doi:%s?mailto=%s&select=abstract_inverted_index"
-                      % (urllib.parse.quote(doi), urllib.parse.quote(email)), email)
+                      % (urllib.parse.quote(doi), urllib.parse.quote(email)))
     inv = (js or {}).get("abstract_inverted_index") if not err else None
     if not inv:
         return None

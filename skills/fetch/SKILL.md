@@ -38,7 +38,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/cli/lfl.py" --email "${user_config.contact_email}
    a row's `auth_url` and pages reached from it. The user approves the batch's sites once; a new site,
    or a batch that grows, asks them again, so only widen a batch for a paper they asked for. Sites
    they approved in earlier batches may already be allowed; the approval prompt lists them. The batch
-   has a page budget. When the guard denies a call, or the user declines a prompt, report it and stop.
+   has a page budget, and a click or key press there counts against it when it opens a page. When
+   the guard denies a call, or the user declines a prompt, report it and stop.
    Never look for another route to the same result.
 5. **Never relay a link minted by a logged-in page** (a short-lived or tokenised PDF URL) to `curl`,
    `lfl`, WebFetch or any client outside the library browser. If a publisher offers the file only

@@ -30,7 +30,7 @@ Claude Code then asks for the plugin's settings:
 
 | Setting | What to enter |
 |---|---|
-| Contact email | sent to OpenAlex and Unpaywall as the polite-pool contact (Unpaywall requires one); sent nowhere else |
+| Contact email | sent only to OpenAlex and Unpaywall, in the request parameter each asks for (Unpaywall requires one) |
 | Library access mode | `ezproxy-host` if your library proxy rewrites hostnames (`www-example-com.proxy.library.example.edu`); `none` if your network is already entitled (campus or VPN) |
 | Library proxy suffix | e.g. `proxy.library.example.edu`. Your library's website lists it, and so do Zotero's and Lean Library's settings |
 | Library sign-in URL | the address that starts your library sign-in, e.g. `https://login.proxy.library.example.edu/login?url=https://www.example.com/` |
@@ -129,13 +129,15 @@ instructions. A plugin cannot ship permission rules, so the rule is enforced by 
 | redirect the logged-in browser to a site of its choosing | the redirect itself happens inside one page load and cannot be stopped; the site is not trusted, so opening it again asks and the prompt names the redirect | enforced from the next page load |
 | reuse a site approved in an earlier batch | allowed only in batches that include the site it was approved from, and listed in their approval prompt | enforced; forget with `/lit-fetch-ladder:sites` |
 | fetch a proxied address with `curl` or WebFetch, outside the counted browser | denied | enforced for proxied addresses; a tokenised link on a site that is not proxied is a rule in the skill |
-| loop | per-paper budget, 20 page loads per burst, 60 per 24 hours | enforced |
+| loop, by navigating or by clicking through pages | per-paper budget, 20 page loads per burst, 60 per 24 hours; a click or key press in the logged-in browser counts when it opens a page or a tab | enforced |
 | make you run the sign-in, or run it itself | the agent is blocked from running it | enforced |
 | open more papers from the same publisher within the budget | bounded by the budget, not prevented | partly |
 
 Read-only browser calls (navigate, snapshot, screenshot, wait) and page loads inside an approved batch
 are allowed by the guard outright, so they do not prompt; a plugin cannot ship allow rules, and
 without this every page load would. A hook's allow never overrides a deny rule in your own settings.
+Clicks, typing and other page interactions always ask. In the logged-in browser they also need an
+approved batch, and one that opens a page or a tab counts as a page load; one that does not is refunded.
 
 If the guard cannot run (for example Node is missing), the browsers cannot start either: both need
 Node. If the guard fails while judging a browser call, it denies the call. Playwright MCP 0.0.78
@@ -165,9 +167,12 @@ deny   fetch a proxied PDF with curl, outside the counted browser
 deny   read raw request headers (the session cookie)
 ask    send data to a collector site from the logged-in browser
 ask    open another publisher through the proxy in a new tab
+ask    go back to the site a page redirected the browser to
 deny   run the library sign-in itself
 ask    first page after the batch grew from 2 to 42 papers
-deny   a page load past the batch budget
+ask    click through to the next article instead of navigating
+deny   a page load past the batch budget (4 more loads allowed)
+deny   click a link once the batch budget is spent
 ```
 
 ## Limits, and why they are low
@@ -198,8 +203,10 @@ without them is not recommended.
 
 ## What is sent where
 
-Your contact email goes to OpenAlex and Unpaywall with each request. The browsers talk to the sites
-they open. Nothing else leaves your machine, and nothing is sent to the author of this plugin.
+Your contact email goes only to OpenAlex and Unpaywall, in the request parameter each asks for.
+Every other request the tools make, to doi.org and to open-access hosts, identifies itself only as
+`lit-fetch-ladder/<version>`. The browsers talk to the sites they open. Nothing is sent to the author
+of this plugin.
 
 ## Uninstall and data
 

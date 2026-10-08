@@ -11,7 +11,7 @@
     "contact_email": {
       "type": "string",
       "title": "Contact email",
-      "description": "Sent to OpenAlex and Unpaywall as the polite-pool contact (Unpaywall requires one). Sent nowhere else.",
+      "description": "Sent only to OpenAlex and Unpaywall, which ask for a contact address (Unpaywall requires one).",
       "required": true
     },
     "proxy_mode": {

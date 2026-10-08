@@ -17,7 +17,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "mcp__plugin_lit-fetch-ladder_library__browser_(navigate|navigate_back|tabs)",
+        "matcher": "mcp__plugin_lit-fetch-ladder_library__browser_(navigate|navigate_back|tabs|click|drag|drop|fill_form|handle_dialog|hover|press_key|select_option|type|mouse_.*)",
         "hooks": [
           {
             "type": "command",
@@ -32,7 +32,7 @@
     ],
     "PostToolUseFailure": [
       {
-        "matcher": "mcp__plugin_lit-fetch-ladder_library__browser_(navigate|navigate_back|tabs)",
+        "matcher": "mcp__plugin_lit-fetch-ladder_library__browser_(navigate|navigate_back|tabs|click|drag|drop|fill_form|handle_dialog|hover|press_key|select_option|type|mouse_.*)",
         "hooks": [
           {
             "type": "command",

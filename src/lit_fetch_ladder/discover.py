@@ -37,7 +37,7 @@ def search(query, email, limit=15, from_year=None, oa_only=False):
         filt.append("is_oa:true")
     if filt:
         params["filter"] = ",".join(filt)
-    data, err = net.get(OPENALEX + "?" + urllib.parse.urlencode(params), email)
+    data, err = net.get(OPENALEX + "?" + urllib.parse.urlencode(params))
     if err:
         raise RuntimeError("OpenAlex: %s" % err)
     return [_row(w) for w in data.get("results", [])][:limit]
@@ -45,7 +45,7 @@ def search(query, email, limit=15, from_year=None, oa_only=False):
 
 def refs_of(doi, email, limit=50):
     w, err = net.get(OPENALEX + "/doi:" + urllib.parse.quote(net.norm_doi(doi)) + "?"
-                     + urllib.parse.urlencode({"mailto": email, "select": "referenced_works"}), email)
+                     + urllib.parse.urlencode({"mailto": email, "select": "referenced_works"}))
     if err:
         raise RuntimeError("OpenAlex: %s" % err)
     refs = (w.get("referenced_works") or [])[:limit]
@@ -53,7 +53,7 @@ def refs_of(doi, email, limit=50):
     for i in range(0, len(refs), 50):  # the filter takes at most 50 ids per call
         ids = "|".join(r.rsplit("/", 1)[-1] for r in refs[i:i + 50])
         data, err = net.get(OPENALEX + "?" + urllib.parse.urlencode(
-            {"filter": "openalex_id:" + ids, "per-page": 50, "mailto": email, "select": SELECT}), email)
+            {"filter": "openalex_id:" + ids, "per-page": 50, "mailto": email, "select": SELECT}))
         if err:
             raise RuntimeError("OpenAlex: %s" % err)
         rows += [_row(x) for x in data.get("results", [])]

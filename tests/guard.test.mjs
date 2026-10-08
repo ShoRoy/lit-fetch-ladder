@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deproxify, siteOf } from '../guard/guard.mjs';
+import { config, deproxify, pageState, siteOf } from '../guard/guard.mjs';
 
 const GUARD = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'guard', 'guard.mjs');
 const P = 'mcp__plugin_lit-fetch-ladder_';
@@ -61,12 +61,12 @@ const libNav = (url) => pre(`${P}library__browser_navigate`, { url });
 const libUrl = (host, p = '/x') => `https://${host}.${SUFFIX}${p}`;
 
 // Approve the active batch: first navigation asks, then the call "runs" (PostToolUse).
-function approve(sb) {
+function approve(sb, response = '') {
   const url = libUrl('www-examplepub-com', '/doi/10.1/a');
   const r = run(sb, libNav(url));
   assert.equal(r.decision, 'ask');
   assert.match(r.reason, /approve library batch/);
-  run(sb, post(`${P}library__browser_navigate`, { url }));
+  run(sb, post(`${P}library__browser_navigate`, { url }, response));
 }
 
 // ---------------------------------------------------------------- browser policy (both servers)
@@ -253,6 +253,96 @@ test('burst cap stops a run, and user settings cannot raise it above 20', () => 
   approve(big);
   for (let i = 0; i < 19; i++) assert.equal(run(big, libNav(u)).decision, 'allow', `load ${i + 2}`);
   assert.match(run(big, libNav(u)).reason, /burst cap reached \(20/);
+});
+
+// ---------------------------------------------------------------- interactions in the logged-in browser
+
+// A Playwright MCP result as PostToolUse receives it: the page address, and the tab list when
+// more than one tab is open (the format 0.0.78 returns).
+function mcpPage(url, otherTabs = []) {
+  const tabs = otherTabs.length
+    ? ['### Open tabs', `- 0: (current) [T](${url})`, ...otherTabs.map((u, i) => `- ${i + 1}: [T](${u})`)] : [];
+  return [{ type: 'text', text: [...tabs, '### Page', `- Page URL: ${url}`].join('\n') }];
+}
+const libClick = (target) => pre(`${P}library__browser_click`, { target, element: 'link' });
+const libClickDone = (target, response) => post(`${P}library__browser_click`, { target, element: 'link' }, response);
+
+test('pageState reads the address and the tab count from a Playwright MCP 0.0.78 result', () => {
+  const one = '### Ran Playwright code\n```js\nawait page.click()\n```\n### Page\n- Page URL: https://a.example/x#sec\n- Page Title: A\n### Snapshot\n';
+  assert.deepEqual(pageState([{ type: 'text', text: one }]), { url: 'https://a.example/x#sec', tabs: 1 });
+  const two = '### Open tabs\n- 0: (current) [A](https://a.example/x)\n- 1: [C](https://a.example/c)\n### Page\n- Page URL: https://a.example/x\n';
+  assert.deepEqual(pageState({ content: [{ type: 'text', text: two }] }), { url: 'https://a.example/x', tabs: 2 });
+  const list = '### Result\n- 0: [A](https://a.example/x)\n- 1: (current) [C](https://a.example/c)\n';
+  assert.deepEqual(pageState(list), { url: 'https://a.example/c', tabs: 2 });
+  assert.deepEqual(pageState([{ type: 'text', text: 'Error: timed out' }]), { url: null, tabs: 0 });
+});
+
+test('a click in the logged-in browser needs an approved batch; in the plain browser it only asks', () => {
+  const sb = sandbox();
+  const r = run(sb, libClick('e1'));
+  assert.equal(r.decision, 'deny');
+  assert.match(r.reason, /no batch is approved/);
+  assert.equal(run(sb, pre(`${P}browse__browser_click`, { target: 'e1' })).decision, 'ask');
+  approve(sb);
+  const asked = run(sb, libClick('e1'));
+  assert.equal(asked.decision, 'ask');
+  assert.match(asked.reason, /counts as one of the batch's page loads/);
+});
+
+test('a click that opens a page counts as a page load; one that does not is refunded', () => {
+  const sb = sandbox();  // 2 papers x 2 pages = 4 loads
+  const a = libUrl('www-examplepub-com', '/doi/10.1/a');
+  approve(sb, mcpPage(a));                                  // load 1; the browser is on a
+  assert.equal(run(sb, libClick('e1')).decision, 'ask');   // reserves load 2
+  run(sb, libClickDone('e1', mcpPage(`${a}#refs`)));       // same page (a fragment): refunded
+  assert.equal(run(sb, libClick('e2')).decision, 'ask');   // reserves load 2 again
+  run(sb, libClickDone('e2', mcpPage(libUrl('www-examplepub-com', '/doi/epdf/10.1/a'))));  // a new page: it stands
+  const u = libUrl('www-examplepub-com');
+  assert.equal(run(sb, libNav(u)).decision, 'allow');      // 3
+  assert.equal(run(sb, libNav(u)).decision, 'allow');      // 4
+  assert.match(run(sb, libNav(u)).reason, /batch budget spent/);
+});
+
+test('a click that opens a new tab counts, and a click is denied once the budget is spent', () => {
+  const sb = sandbox();  // 4 loads
+  const a = libUrl('www-examplepub-com', '/doi/10.1/a');
+  approve(sb, mcpPage(a));                                  // 1
+  run(sb, libClick('e1'));                                  // 2 reserved
+  run(sb, libClickDone('e1', mcpPage(a, [libUrl('www-examplepub-com', '/doi/pdf/10.1/a')])));  // same page, a new tab: it stands
+  const u = libUrl('www-examplepub-com');
+  assert.equal(run(sb, libNav(u)).decision, 'allow');      // 3
+  assert.equal(run(sb, libNav(u)).decision, 'allow');      // 4
+  const r = run(sb, libClick('e2'));
+  assert.equal(r.decision, 'deny');
+  assert.match(r.reason, /batch budget spent.*so it counts/);
+});
+
+test('a click whose result does not say where the browser is keeps its page load', () => {
+  const sb = sandbox();
+  const a = libUrl('www-examplepub-com', '/doi/10.1/a');
+  approve(sb, mcpPage(a));                                  // 1
+  run(sb, libClick('e1'));                                  // 2
+  run(sb, libClickDone('e1', [{ type: 'text', text: 'Error: timed out' }]));  // unknown: it stands
+  const u = libUrl('www-examplepub-com');
+  run(sb, libNav(u)); run(sb, libNav(u));                   // 3, 4
+  assert.match(run(sb, libNav(u)).reason, /batch budget spent/);
+});
+
+test('daily cap stops page loads, and settings cannot raise any cap above its ceiling', () => {
+  const sb = sandbox({ opts: { cap_daily: 3, pages_per_paper: 8 } });
+  approve(sb);                                              // 1
+  const u = libUrl('www-examplepub-com');
+  run(sb, libNav(u)); run(sb, libNav(u));                   // 2, 3
+  assert.match(run(sb, libNav(u)).reason, /daily cap reached \(3/);
+  const keys = ['CAP_BURST', 'CAP_DAILY', 'PAGES_PER_PAPER'].map((k) => `CLAUDE_PLUGIN_OPTION_${k}`);
+  const saved = keys.map((k) => process.env[k]);
+  try {
+    for (const k of keys) process.env[k] = '999';
+    const c = config();
+    assert.deepEqual([c.burst, c.daily, c.perPaper], [20, 60, 8]);
+  } finally {
+    keys.forEach((k, i) => { if (saved[i] === undefined) delete process.env[k]; else process.env[k] = saved[i]; });
+  }
 });
 
 test('unreadable guard state fails closed', () => {

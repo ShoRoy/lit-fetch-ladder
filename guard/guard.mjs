@@ -10,8 +10,9 @@
 //      the first page load of a batch asks the user to approve it, a batch that
 //      grows asks again, and a site outside the batch asks.
 //   4. Page loads on the library browser are budgeted per approved paper and
-//      capped per burst and per 24 hours. Counting happens before the call, so
-//      a failure errs toward fewer loads, never more.
+//      capped per burst and per 24 hours, including a page that a click, key
+//      press or form action opens. Counting happens before the call, so a
+//      failure errs toward fewer loads, never more.
 //   5. The saved login and the guard's own state are off-limits to the agent's
 //      file and shell tools.
 // A crash while judging a browser call denies the call (fail closed).
@@ -250,7 +251,10 @@ function isNavigation(tool, input) {
 
 function judgeBrowser(cfg, server, tool, input, now, key) {
   if (DENY_RE.test(tool)) return out('deny', `browser tool "${tool}" is disabled (it can run code, read session data, or move local files).`);
-  if (ASK_RE.test(tool)) return out('ask', `"${tool}" interacts with the page; confirm it is part of fetching a paper you asked for.`);
+  if (ASK_RE.test(tool)) {
+    if (server === 'library') return judgeLibraryInteraction(cfg, tool, now, key);
+    return out('ask', `"${tool}" interacts with the page; confirm it is part of fetching a paper you asked for.`);
+  }
   if (!ALLOW.has(tool)) return out('ask', `unrecognised browser tool "${tool}"; confirm before it runs.`);
 
   const url = navigationUrl(tool, input);
@@ -260,6 +264,31 @@ function judgeBrowser(cfg, server, tool, input, now, key) {
   }
   if (server === 'browse' || !isNavigation(tool, input)) return ok(`read-only browser tool "${tool}"`);
   return judgeLibraryNavigation(cfg, tool, input, url, now, key);
+}
+
+// Drop what has aged out: page loads and approvals older than a day, and page loads
+// reserved for interactions whose result never came back.
+function prune(st, now) {
+  st.loads = st.loads.filter((t) => now - t < DAY_MS);
+  st.approvals = st.approvals.filter((a) => now - a.ts < APPROVAL_MS);
+  for (const [k, r] of Object.entries(st.reservations || {})) if (now - r.ts >= DAY_MS) delete st.reservations[k];
+}
+
+// The page-load caps, shared by navigations and by interactions that may load a page.
+// Returns { reason } when one is reached, otherwise { burst }: the burst count after this load.
+function checkCaps(cfg, st, approval, now) {
+  if (st.loads.length + 1 > cfg.daily) {
+    return { reason: `daily cap reached (${cfg.daily} authenticated page loads in 24 h). Stop and tell the user.` };
+  }
+  const burst = now - st.burst.last > IDLE_MS ? 1 : st.burst.count + 1;
+  if (burst > cfg.burst) {
+    return { reason: `burst cap reached (${cfg.burst} page loads). An unexpected overrun is the signature of a runaway or injected loop. Stop and confirm the scope with the user.` };
+  }
+  const budget = approval ? approval.targets.length * cfg.perPaper : 0;
+  if (approval && approval.used + 1 > budget) {
+    return { reason: `batch budget spent (${budget} page loads for ${approval.targets.length} paper(s)). Report progress; a new batch needs the user's approval.` };
+  }
+  return { burst };
 }
 
 function judgeLibraryNavigation(cfg, tool, input, url, now, key) {
@@ -274,37 +303,53 @@ function judgeLibraryNavigation(cfg, tool, input, url, now, key) {
 
   return withLock(cfg, () => {
     const st = loadState(cfg);
-    st.loads = st.loads.filter((t) => now - t < DAY_MS);
-    st.approvals = st.approvals.filter((a) => now - a.ts < APPROVAL_MS);
-
-    if (st.loads.length + 1 > cfg.daily) {
+    prune(st, now);
+    const approval = findApproval(st, batch, now);
+    const cap = checkCaps(cfg, st, approval, now);
+    if (cap.reason) {
       saveState(cfg, st);
-      return out('deny', `daily cap reached (${cfg.daily} authenticated page loads in 24 h). Stop and tell the user.`);
-    }
-    const burst = now - st.burst.last > IDLE_MS ? 1 : st.burst.count + 1;
-    if (burst > cfg.burst) {
-      saveState(cfg, st);
-      return out('deny', `burst cap reached (${cfg.burst} page loads). An unexpected overrun is the signature of a runaway or injected loop. Stop and confirm the scope with the user.`);
+      return out('deny', cap.reason);
     }
 
     let decision = null;
-    const approval = findApproval(st, batch, now);
     if (!approval) {
       decision = askForBatch(cfg, st, batch, key, now);
     } else {
-      const budget = approval.targets.length * cfg.perPaper;
-      if (approval.used + 1 > budget) {
-        saveState(cfg, st);
-        return out('deny', `batch budget spent (${budget} page loads for ${approval.targets.length} paper(s)). Report progress; a new batch needs the user's approval.`);
-      }
       approval.used += 1;
       if (url) decision = judgeSite(cfg, st, url, approval, batch, key, now);
     }
 
     st.loads.push(now);
-    st.burst = { last: now, count: burst };
+    st.burst = { last: now, count: cap.burst };
     saveState(cfg, st);
     return decision || ok('approved batch, within budget');
+  });
+}
+
+// A click, key press, form action or dialog in the logged-in browser can open a page, so
+// it is charged to the approved batch like a navigation: the caps are checked and one page
+// load is reserved before the call. PostToolUse refunds it if the call opened no page and
+// no tab. With no approved batch there is nothing to charge, so the call is denied.
+function judgeLibraryInteraction(cfg, tool, now, key) {
+  const batch = activeBatch(cfg);
+  return withLock(cfg, () => {
+    const st = loadState(cfg);
+    prune(st, now);
+    const approval = batch && batch.targets.length ? findApproval(st, batch, now) : null;
+    if (!approval) {
+      return out('deny', `"${tool}" in the logged-in browser can open a page, which is charged to an approved batch, and no batch is approved. Open a staged paper first.`);
+    }
+    const cap = checkCaps(cfg, st, approval, now);
+    if (cap.reason) {
+      saveState(cfg, st);
+      return out('deny', `${cap.reason} A click or key press in the logged-in browser can open a page, so it counts.`);
+    }
+    (st.reservations ||= {})[key] = { ts: now, approvalTs: approval.ts, burst: st.burst };
+    approval.used += 1;
+    st.loads.push(now);
+    st.burst = { last: now, count: cap.burst };
+    saveState(cfg, st);
+    return out('ask', `"${tool}" interacts with the logged-in page; confirm it is part of fetching a paper you asked for. If it opens a page, that counts as one of the batch's page loads.`);
   });
 }
 
@@ -419,47 +464,113 @@ function preToolUse(cfg, ev, now) {
   }
 }
 
-// After a library navigation actually ran. The call only runs if the user said yes
-// to its prompt, so the pending approval it carried (a batch, a grown batch, or a
-// new site) is recorded. Sites the browser was redirected to are noted, not
-// approved: navigating to one later asks, and the prompt says where it came from.
+// After a library browser call ran. A navigation only runs if the user said yes to its
+// prompt, so the pending approval it carried (a batch, a grown batch, or a new site) is
+// recorded. Sites the browser was redirected to are noted, not approved: navigating to one
+// later asks, and the prompt says where it came from. An interaction's reserved page load
+// is settled. Every result also updates where the browser is and how many tabs it has
+// open, which is what the next interaction is compared against.
 function postToolUse(cfg, ev, now) {
   const m = BROWSER_RE.exec(ev.tool_name || '');
   if (!m || m[1] !== 'library') return null;
+  const tool = m[2];
   const input = ev.tool_input || {};
-  if (!isNavigation(m[2], input)) return null;
+  const navigated = isNavigation(tool, input);
+  const interacted = ASK_RE.test(tool);
+  if (!navigated && !interacted && tool !== 'tabs') return null;
   withLock(cfg, () => {
     const st = loadState(cfg);
-    const p = st.pending;
-    if (p && p.call === callKey(ev.tool_name, input)) {
-      if (p.kind === 'batch') {
-        st.approvals = st.approvals.filter((a) => a.ts !== p.replaces);
-        st.approvals.push({ batch: p.batch, targets: p.targets, sites: p.sites, used: p.used, ts: p.ts, redirected: {} });
-      } else if (p.kind === 'site') {
-        const a = st.approvals.find((x) => x.ts === p.approvalTs);
-        if (a && !a.sites.includes(p.site)) a.sites.push(p.site);
-        if (p.from && p.from !== p.site) ((st.companions ||= {})[p.from] ||= {})[p.site] = now;
-      }
-      delete st.pending;
-    }
-    const batch = activeBatch(cfg);
-    const approval = batch && findApproval(st, batch, now);
-    const requested = navigationUrl(m[2], input);
-    if (approval && requested) {
-      const fromSite = targetSite(cfg, requested);
-      const landed = [...JSON.stringify(ev.tool_response || '').matchAll(/Page URL: (https?:\/\/[^\s"\\]+)/g)].map((x) => x[1]);
-      for (const u of landed) {
-        const site = targetSite(cfg, u);
-        if (site && !approval.sites.includes(site)) (approval.redirected ||= {})[site] = fromSite;
-      }
-    }
-    if (requested) {  // the site the browser is now on: the last page it landed on
-      const landedLast = [...JSON.stringify(ev.tool_response || '').matchAll(/Page URL: (https?:\/\/[^\s"\\]+)/g)].pop();
-      st.lastSite = targetSite(cfg, landedLast ? landedLast[1] : requested) || st.lastSite;
-    }
+    const page = pageState(ev.tool_response);
+    if (interacted) settleInteraction(cfg, st, callKey(ev.tool_name, input), page, now);
+    if (navigated) recordNavigation(cfg, st, ev, tool, input, now);
+    if (page.url) st.lastUrl = page.url;
+    if (page.tabs) st.tabCount = page.tabs;
     saveState(cfg, st);
   });
   return null;
+}
+
+function recordNavigation(cfg, st, ev, tool, input, now) {
+  const p = st.pending;
+  if (p && p.call === callKey(ev.tool_name, input)) {
+    if (p.kind === 'batch') {
+      st.approvals = st.approvals.filter((a) => a.ts !== p.replaces);
+      st.approvals.push({ batch: p.batch, targets: p.targets, sites: p.sites, used: p.used, ts: p.ts, redirected: {} });
+    } else if (p.kind === 'site') {
+      const a = st.approvals.find((x) => x.ts === p.approvalTs);
+      if (a && !a.sites.includes(p.site)) a.sites.push(p.site);
+      if (p.from && p.from !== p.site) ((st.companions ||= {})[p.from] ||= {})[p.site] = now;
+    }
+    delete st.pending;
+  }
+  const batch = activeBatch(cfg);
+  const approval = batch && findApproval(st, batch, now);
+  const requested = navigationUrl(tool, input);
+  if (approval && requested) {
+    const fromSite = targetSite(cfg, requested);
+    const landed = [...JSON.stringify(ev.tool_response || '').matchAll(/Page URL: (https?:\/\/[^\s"\\]+)/g)].map((x) => x[1]);
+    for (const u of landed) {
+      const site = targetSite(cfg, u);
+      if (site && !approval.sites.includes(site)) (approval.redirected ||= {})[site] = fromSite;
+    }
+  }
+  if (requested) {  // the site the browser is now on: the last page it landed on
+    const landedLast = [...JSON.stringify(ev.tool_response || '').matchAll(/Page URL: (https?:\/\/[^\s"\\]+)/g)].pop();
+    st.lastSite = targetSite(cfg, landedLast ? landedLast[1] : requested) || st.lastSite;
+  }
+}
+
+// An interaction's result. If it opened a page (the address changed, ignoring a #fragment)
+// or a tab (more tabs open than before), the page load reserved for it stands, plus one per
+// extra tab. A result that does not say where the browser is counts as a page load too.
+// Otherwise the reservation is refunded.
+function settleInteraction(cfg, st, key, page, now) {
+  const r = (st.reservations || {})[key];
+  if (r) delete st.reservations[key];
+  const approval = r ? st.approvals.find((a) => a.ts === r.approvalTs) : null;
+  const moved = !page.url || !st.lastUrl || pageKey(page.url) !== pageKey(st.lastUrl);
+  const loads = (moved ? 1 : 0) + Math.max(0, page.tabs - (st.tabCount || 1));
+  if (r && loads === 0) {
+    if (approval) approval.used = Math.max(0, approval.used - 1);
+    const i = st.loads.lastIndexOf(r.ts);
+    if (i >= 0) st.loads.splice(i, 1);
+    st.burst = st.burst.last === r.ts ? r.burst : { last: st.burst.last, count: Math.max(0, st.burst.count - 1) };
+    return;
+  }
+  for (let i = 1; i < loads; i++) {
+    st.loads.push(now);
+    if (approval) approval.used += 1;
+    st.burst = { last: now, count: st.burst.count + 1 };
+  }
+  if (page.url) st.lastSite = targetSite(cfg, page.url) || st.lastSite;
+}
+
+// What a Playwright MCP result says about the browser after a call: the current page's
+// address, and how many tabs are open (the result lists tabs only when there is more than one).
+function responseText(resp) {
+  if (typeof resp === 'string') return resp;
+  const blocks = Array.isArray(resp) ? resp : (resp && Array.isArray(resp.content) ? resp.content : null);
+  if (blocks) return blocks.map((b) => (typeof b === 'string' ? b : (b && b.text) || '')).join('\n');
+  return JSON.stringify(resp ?? '').replace(/\\n/g, '\n');
+}
+
+export function pageState(resp) {
+  const text = responseText(resp);
+  const tabs = [...text.matchAll(/^- \d+: (\(current\) )?\[.*\]\((\S+)\)\s*$/gm)];
+  const current = tabs.find((t) => t[1]);
+  const shown = [...text.matchAll(/Page URL: (https?:\/\/[^\s"\\]+)/g)].pop();
+  const url = shown ? shown[1] : (current ? current[2] : null);
+  return { url, tabs: tabs.length || (url ? 1 : 0) };
+}
+
+function pageKey(u) {
+  try {
+    const x = new URL(u);
+    x.hash = '';
+    return x.href;
+  } catch {
+    return u;
+  }
 }
 
 function sessionStart(cfg) {

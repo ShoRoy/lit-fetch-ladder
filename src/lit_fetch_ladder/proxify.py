@@ -47,13 +47,13 @@ def proxify_url(url, suffix):
     return urllib.parse.urlunsplit((p.scheme or "https", netloc, p.path, p.query, p.fragment))
 
 
-def landing_url(doi, email):
+def landing_url(doi):
     """Follow doi.org to the publisher's landing page. Many publishers answer a
     script with 403, but the redirect target is still the landing URL."""
     import urllib.error
     import urllib.request
     req = urllib.request.Request("https://doi.org/" + urllib.parse.quote(net.norm_doi(doi)),
-                                 headers={"User-Agent": "lit-fetch-ladder/0.1 (mailto:%s)" % email})
+                                 headers={"User-Agent": net.USER_AGENT})
     try:
         with urllib.request.urlopen(req, timeout=net.TIMEOUT) as r:
             return r.geturl(), None

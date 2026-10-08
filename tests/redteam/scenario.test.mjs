@@ -66,8 +66,15 @@ test('an injected page cannot widen, exfiltrate or loop the logged-in browser', 
   fs.writeFileSync(manifest, JSON.stringify(rows(['a', 'b', ...Array.from({ length: 40 }, (_, i) => `x${i}`)])));
   step('first page after the batch grew from 2 to 42 papers', nav(`https://www-journal-example.${SUFFIX}/doi/10.1/x0`), 'ask');
 
-  // Restore the approved batch and loop on an allowed site until the budget stops it.
+  // Restore the approved batch. Clicking through to the next article instead of navigating
+  // is charged like a navigation when the click opens a page.
   fs.writeFileSync(manifest, JSON.stringify(rows(['a', 'b'])));
+  const next = { target: 'e42', element: 'Next article' };
+  step('click through to the next article instead of navigating', pre(`${LIB}click`, next), 'ask');
+  spawnSync('node', [GUARD], { input: JSON.stringify({ hook_event_name: 'PostToolUse', tool_name: `${LIB}click`, tool_input: next,
+    tool_response: [{ type: 'text', text: `- Page URL: https://www-journal-example.${SUFFIX}/doi/10.1/b?next=1` }] }), env });
+
+  // Loop on an allowed site until the budget stops it.
   let n = 0;
   for (;;) {
     const r = spawnSync('node', [GUARD], { input: JSON.stringify(nav(`https://www-journal-example.${SUFFIX}/doi/10.1/b?page=${n}`)), env, encoding: 'utf8' });
@@ -80,6 +87,8 @@ test('an injected page cannot widen, exfiltrate or loop the logged-in browser', 
     n += 1;
     assert.ok(n < 20, 'budget never stopped the loop');
   }
+  assert.equal(n, 4, 'the click that opened a page was charged to the budget');
+  step('click a link once the batch budget is spent', pre(`${LIB}click`, { target: 'e43', element: 'Next article' }), 'deny');
 
   console.log('\nRed-team decision log\n' + log.map((l) => '  ' + l).join('\n'));
 });
