@@ -1,0 +1,27 @@
+{
+  "batch": "example",
+  "created": "2026-10-05T12:00:00",
+  "items": [
+    {"input": "10.0000/example.open", "doi": "10.0000/example.open", "state": "OA_FETCHED", "title": "An open paper", "year": 2021,
+     "path": "lit-fetch-runs/example/pdfs/example.open.pdf", "url": "https://repository.example.org/example.open.pdf", "sha256": "<64 hex characters>"},
+    {"input": "10.0000/example.landing", "doi": "10.0000/example.landing", "state": "OA_LANDING", "title": "Open, but only as a landing page", "year": 2019,
+     "url": "https://repository.example.org/record/123", "auth_url": "https://www-publisher-example-org.proxy.library.example.edu/doi/10.0000/example.landing",
+     "note": "open access, landing page only"},
+    {"input": "10.0000/example.closed", "doi": "10.0000/example.closed", "state": "PROXY_FETCHED", "title": "A subscription paper", "year": 2018,
+     "auth_url": "https://www-publisher-example-org.proxy.library.example.edu/doi/10.0000/example.closed",
+     "path": "lit-fetch-runs/example/pdfs/example.closed.pdf", "sha256": "<64 hex characters>", "kind": "pdf"},
+    {"input": "10.0000/example.viewer", "doi": "10.0000/example.viewer", "state": "PROXY_FETCHED", "title": "A paper shown only in a viewer", "year": 2020,
+     "auth_url": "https://www-society-example-org.proxy.library.example.edu/article/10.0000/example.viewer",
+     "path": "lit-fetch-runs/example/fulltext/example.viewer.html", "kind": "fulltext", "note": "viewer only; PDF is a manual export"},
+    {"input": "10.0000/example.unreachable", "doi": "10.0000/example.unreachable", "state": "ABSTRACT_ONLY", "title": "No route worked", "year": 2017,
+     "auth_url": "https://www-publisher-example-org.proxy.library.example.edu/doi/10.0000/example.unreachable",
+     "abstract": "The abstract is kept so the gap is on the record."},
+    {"input": "10.0000/example.staged", "doi": "10.0000/example.staged", "state": "NEEDS_AUTH", "title": "Waiting for the library browser", "year": 2022,
+     "auth_url": "https://www-publisher-example-org.proxy.library.example.edu/doi/10.0000/example.staged",
+     "note": "no open copy; staged for the library browser"},
+    {"input": "a title nobody wrote", "doi": null, "state": "UNRESOLVED", "note": "no confident match for this title; disambiguate with discover",
+     "candidates": [{"title": "A similar title", "doi": "10.0000/example.similar", "year": 2016}]},
+    {"input": "10.0000/example.wrong", "doi": "10.0000/example.wrong", "state": "EXCLUDED", "note": "title query matched an unrelated paper"},
+    {"input": "10.0000/example.error", "doi": "10.0000/example.error", "state": "ERROR", "note": "HTTP 503 from the resolver; retried on the next run"}
+  ]
+}

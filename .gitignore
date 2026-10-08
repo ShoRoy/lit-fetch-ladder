@@ -1,0 +1,12 @@
+# fetched papers and run manifests belong to the user's project, never to this repo
+lit-fetch-runs/
+# a saved library login must never be committed
+library-state.json
+login-raw.json
+*.tmp
+__pycache__/
+*.egg-info/
+build/
+dist/
+.venv/
+node_modules/

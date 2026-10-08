@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lit-fetch-ladder"
+version = "0.1.0"
+description = "Fetch papers for a literature survey, open access first (rungs 0-1 of lit-fetch-ladder)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Shobhan Roy" }]
+dependencies = []
+
+[project.scripts]
+lfl = "lit_fetch_ladder.cli:main"
+
+[project.urls]
+Repository = "https://github.com/ShoRoy/lit-fetch-ladder"
+
+[tool.setuptools.packages.find]
+where = ["src"]

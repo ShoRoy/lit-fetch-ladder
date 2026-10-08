@@ -1,0 +1,14 @@
+{
+  "name": "fetch-ladder",
+  "description": "lit-fetch-ladder: literature fetching for coding agents, open access first, with prompt-injection safeguards.",
+  "owner": {
+    "name": "Shobhan Roy"
+  },
+  "plugins": [
+    {
+      "name": "lit-fetch-ladder",
+      "source": "./",
+      "description": "Literature fetching for coding agents: open access first, then your library login, with prompt-injection safeguards."
+    }
+  ]
+}

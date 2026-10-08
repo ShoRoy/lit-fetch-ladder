@@ -1,0 +1,60 @@
+{
+  "name": "lit-fetch-ladder",
+  "displayName": "Lit Fetch Ladder",
+  "version": "0.1.0",
+  "description": "Fetch papers for a literature survey, open access first: discovery, open-access download, a headless browser, then the same browser carrying your library login, with prompt-injection safeguards enforced as hooks.",
+  "author": { "name": "Shobhan Roy" },
+  "repository": "https://github.com/ShoRoy/lit-fetch-ladder",
+  "license": "MIT",
+  "keywords": ["literature-review", "research", "open-access", "playwright", "ezproxy", "prompt-injection"],
+  "userConfig": {
+    "contact_email": {
+      "type": "string",
+      "title": "Contact email",
+      "description": "Sent to OpenAlex and Unpaywall as the polite-pool contact (Unpaywall requires one). Sent nowhere else.",
+      "required": true
+    },
+    "proxy_mode": {
+      "type": "string",
+      "title": "Library access mode",
+      "description": "ezproxy-host: your library proxy rewrites hostnames (www-example-com.<suffix>). none: your network is already entitled (campus or VPN), no proxy and no saved login.",
+      "default": "ezproxy-host"
+    },
+    "proxy_suffix": {
+      "type": "string",
+      "title": "Library proxy suffix",
+      "description": "The part your library's proxy adds to publisher hostnames, e.g. proxy.library.example.edu. Your library's website, or your Zotero / Lean Library settings, list it.",
+      "default": ""
+    },
+    "proxy_login_url": {
+      "type": "string",
+      "title": "Library sign-in URL",
+      "description": "The address that starts your library sign-in, e.g. https://login.proxy.library.example.edu/login?url=https://www.example.com/",
+      "default": ""
+    },
+    "user_agent": {
+      "type": "string",
+      "title": "Browser user-agent (optional)",
+      "description": "Leave empty for Playwright's default. A normal desktop string gets past soft bot checks on some publisher pages; it does not defeat real bot protection and is not meant to.",
+      "default": ""
+    },
+    "cap_burst": {
+      "type": "number",
+      "title": "Library page loads per burst",
+      "description": "Authenticated page loads allowed before a 15-minute pause resets the count. At most 20.",
+      "default": 20, "min": 1, "max": 20
+    },
+    "cap_daily": {
+      "type": "number",
+      "title": "Library page loads per 24 hours",
+      "description": "Rolling 24-hour limit on authenticated page loads. At most 60.",
+      "default": 60, "min": 1, "max": 60
+    },
+    "pages_per_paper": {
+      "type": "number",
+      "title": "Page loads per approved paper",
+      "description": "A batch may use at most this many authenticated page loads per paper you approved. At most 8.",
+      "default": 5, "min": 1, "max": 8
+    }
+  }
+}
