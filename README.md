@@ -133,6 +133,10 @@ instructions. A plugin cannot ship permission rules, so the rule is enforced by 
 | make you run the sign-in, or run it itself | the agent is blocked from running it | enforced |
 | open more papers from the same publisher within the budget | bounded by the budget, not prevented | partly |
 
+Read-only browser calls (navigate, snapshot, screenshot, wait) and page loads inside an approved batch
+are allowed by the guard outright, so they do not prompt; a plugin cannot ship allow rules, and
+without this every page load would. A hook's allow never overrides a deny rule in your own settings.
+
 If the guard cannot run (for example Node is missing), the browsers cannot start either: both need
 Node. If the guard fails while judging a browser call, it denies the call. Playwright MCP 0.0.78
 exposes `browser_evaluate` and `browser_run_code_unsafe` even without extra capabilities and has no

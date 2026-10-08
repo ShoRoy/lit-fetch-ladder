@@ -92,13 +92,13 @@ test('interaction tools ask; unknown tools ask', () => {
 test('read-only tools pass silently, including the plural network_requests', () => {
   const sb = sandbox();
   for (const t of ['snapshot', 'take_screenshot', 'wait_for', 'network_requests', 'console_messages', 'close']) {
-    assert.equal(run(sb, pre(`${P}browse__browser_${t}`)).decision, 'none', t);
+    assert.equal(run(sb, pre(`${P}browse__browser_${t}`)).decision, 'allow', t);
   }
 });
 
 test('only http(s) can be opened, on either server and in a new tab', () => {
   const sb = sandbox();
-  assert.equal(run(sb, pre(`${P}browse__browser_navigate`, { url: 'https://arxiv.org/abs/1' })).decision, 'none');
+  assert.equal(run(sb, pre(`${P}browse__browser_navigate`, { url: 'https://arxiv.org/abs/1' })).decision, 'allow');
   for (const url of ['file:///etc/passwd', 'javascript:alert(1)', 'chrome://settings', 'not a url']) {
     assert.equal(run(sb, pre(`${P}browse__browser_navigate`, { url })).decision, 'deny', url);
     assert.equal(run(sb, pre(`${P}browse__browser_tabs`, { action: 'new', url })).decision, 'deny', `tab ${url}`);
@@ -137,7 +137,7 @@ test('library navigation with no proxy_suffix configured is denied', () => {
 test('first page load of a batch asks once; afterwards batch sites pass', () => {
   const sb = sandbox();
   approve(sb);
-  assert.equal(run(sb, libNav(libUrl('pubs-journal-org', '/doi/10.1/b'))).decision, 'none');
+  assert.equal(run(sb, libNav(libUrl('pubs-journal-org', '/doi/10.1/b'))).decision, 'allow');
 });
 
 test('a rejected approval leaves the batch unapproved', () => {
@@ -161,9 +161,9 @@ test('a site outside the batch asks; a sign-in link to an outside site asks', ()
   const sb = sandbox({ opts: { pages_per_paper: 8 } });
   approve(sb);
   assert.equal(run(sb, libNav(libUrl('www-attacker-example', '/bulk'))).decision, 'ask');
-  assert.equal(run(sb, libNav(`https://login.${SUFFIX}/login?url=https://www.examplepub.com/doi/10.1/a`)).decision, 'none');
+  assert.equal(run(sb, libNav(`https://login.${SUFFIX}/login?url=https://www.examplepub.com/doi/10.1/a`)).decision, 'allow');
   assert.equal(run(sb, libNav(`https://login.${SUFFIX}/login?url=https://evil.example/x`)).decision, 'ask');
-  assert.equal(run(sb, libNav('https://www.examplepub.com/not-proxied')).decision, 'none');  // approved site, no login cookies go there
+  assert.equal(run(sb, libNav('https://www.examplepub.com/not-proxied')).decision, 'allow');  // approved site, no login cookies go there
   assert.match(run(sb, libNav('https://www.unapproved.example/x')).reason, /needs a new site: unapproved\.example \(outside the library proxy\)/);
 });
 
@@ -185,7 +185,7 @@ test('a site a redirect lands on is not trusted: navigating there asks, naming t
   assert.match(r.reason, /needs a new site: example\.net \(a page from examplepub\.com redirected the browser there\)/);
   // the user says yes: the call runs, and the site joins the batch
   run(sb, post(`${P}library__browser_navigate`, { url: target }));
-  assert.equal(run(sb, libNav(libUrl('pdf-articles-example-net', '/x.pdf'))).decision, 'none');
+  assert.equal(run(sb, libNav(libUrl('pdf-articles-example-net', '/x.pdf'))).decision, 'allow');
 });
 
 test('the approval prompt lists every site with its paper count', () => {
@@ -204,7 +204,7 @@ test('a rejected site stays unapproved; an approved site stays approved', () => 
   assert.equal(run(sb, libNav(other)).decision, 'ask');          // user says no: nothing runs
   assert.equal(run(sb, libNav(other)).decision, 'ask');          // still asks
   run(sb, post(`${P}library__browser_navigate`, { url: other }));  // this time yes
-  assert.equal(run(sb, libNav(libUrl('cdn-other-example', '/y'))).decision, 'none');
+  assert.equal(run(sb, libNav(libUrl('cdn-other-example', '/y'))).decision, 'allow');
 });
 
 test('a site is a registrable domain, except on shared hosting', () => {
@@ -223,9 +223,9 @@ test('the per-paper budget stops page loads beyond what the batch needs', () => 
   const sb = sandbox();  // 2 papers x 2 pages = 4 loads
   approve(sb);         // load 1
   const u = libUrl('www-examplepub-com');
-  assert.equal(run(sb, libNav(u)).decision, 'none');  // 2
-  assert.equal(run(sb, libNav(u)).decision, 'none');  // 3
-  assert.equal(run(sb, libNav(u)).decision, 'none');  // 4
+  assert.equal(run(sb, libNav(u)).decision, 'allow');  // 2
+  assert.equal(run(sb, libNav(u)).decision, 'allow');  // 3
+  assert.equal(run(sb, libNav(u)).decision, 'allow');  // 4
   const r = run(sb, libNav(u));
   assert.equal(r.decision, 'deny');
   assert.match(r.reason, /batch budget spent/);
@@ -238,7 +238,7 @@ test('a new tab opened at a URL counts like a navigation', () => {
   const u = libUrl('www-examplepub-com');
   run(sb, tab(u)); run(sb, tab(u)); run(sb, tab(u));
   assert.equal(run(sb, tab(u)).decision, 'deny');
-  assert.equal(run(sb, pre(`${P}library__browser_tabs`, { action: 'list' })).decision, 'none');
+  assert.equal(run(sb, pre(`${P}library__browser_tabs`, { action: 'list' })).decision, 'allow');
 });
 
 test('burst cap stops a run, and user settings cannot raise it above 20', () => {
@@ -251,7 +251,7 @@ test('burst cap stops a run, and user settings cannot raise it above 20', () => 
   const big = sandbox({ opts: { cap_burst: 999, pages_per_paper: 8 } });
   writeManifest(big.manifest, ['a', 'b', 'c']);  // budget 24 > 20, so the burst cap binds first
   approve(big);
-  for (let i = 0; i < 19; i++) assert.equal(run(big, libNav(u)).decision, 'none', `load ${i + 2}`);
+  for (let i = 0; i < 19; i++) assert.equal(run(big, libNav(u)).decision, 'allow', `load ${i + 2}`);
   assert.match(run(big, libNav(u)).reason, /burst cap reached \(20/);
 });
 
@@ -307,7 +307,7 @@ test('proxy_mode none: no saved login needed, batch sites are matched directly',
   const nav = (url) => pre(`${P}library__browser_navigate`, { url });
   assert.equal(run(sb, nav('https://www.examplepub.com/doi/10.1/a')).decision, 'ask');  // approval
   run(sb, post(`${P}library__browser_navigate`, { url: 'https://www.examplepub.com/doi/10.1/a' }));
-  assert.equal(run(sb, nav('https://www.examplepub.com/doi/10.1/a/pdf')).decision, 'none');
+  assert.equal(run(sb, nav('https://www.examplepub.com/doi/10.1/a/pdf')).decision, 'allow');
   assert.equal(run(sb, nav('https://elsewhere.example/x')).decision, 'ask');
 });
 
@@ -401,7 +401,7 @@ test('an approved redirect site is remembered: the next batch from that publishe
   assert.equal(r.decision, 'ask');
   assert.match(r.reason, /Also allowed, from your earlier approvals: content\.example \(follows examplepub\.com\)/);
   run(sb, post(`${P}library__browser_navigate`, { url: first }));
-  assert.equal(run(sb, libNav(libUrl('www-content-example', '/article/p'))).decision, 'none');
+  assert.equal(run(sb, libNav(libUrl('www-content-example', '/article/p'))).decision, 'allow');
 });
 
 test('a remembered companion does not apply to a batch without the site it follows', () => {

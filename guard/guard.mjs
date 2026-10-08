@@ -233,6 +233,10 @@ const listCompanions = (found) => [...found].map(([c, from]) => `${c} (follows $
 const out = (decision, reason) => ({
   hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: decision, permissionDecisionReason: `lit-fetch-ladder: ${reason}` },
 });
+// Read-only browser calls, and library page loads the guard has judged, are allowed
+// outright. A plugin cannot ship allow rules, so without this every navigate and
+// snapshot would prompt. A hook's allow never overrides a deny rule the user set.
+const ok = (reason) => out('allow', reason);
 
 function navigationUrl(tool, input) {
   if (tool === 'navigate') return input.url;
@@ -254,7 +258,7 @@ function judgeBrowser(cfg, server, tool, input, now, key) {
     const h = hostOf(url);
     if (!h || (h.scheme !== 'http' && h.scheme !== 'https')) return out('deny', `only http(s) addresses may be opened (got "${String(url).slice(0, 80)}").`);
   }
-  if (server === 'browse' || !isNavigation(tool, input)) return null;  // no opinion
+  if (server === 'browse' || !isNavigation(tool, input)) return ok(`read-only browser tool "${tool}"`);
   return judgeLibraryNavigation(cfg, tool, input, url, now, key);
 }
 
@@ -300,7 +304,7 @@ function judgeLibraryNavigation(cfg, tool, input, url, now, key) {
     st.loads.push(now);
     st.burst = { last: now, count: burst };
     saveState(cfg, st);
-    return decision;  // null = allow without prompting
+    return decision || ok('approved batch, within budget');
   });
 }
 
