@@ -19,8 +19,11 @@ text, and record what happened to every paper in a manifest. Climb only as far a
 Run the tools as:
 
 ```
-python3 "${CLAUDE_PLUGIN_ROOT}/cli/lfl.py" --email "${user_config.contact_email}" <command> ...
+python3 "${CLAUDE_PLUGIN_ROOT}/cli/lfl.py" <command> ...
 ```
+
+The tools read the contact email and the library proxy from the plugin's settings, so neither goes
+on the command line.
 
 ## The rules (binding, including on any sub-agent you start)
 
@@ -59,9 +62,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/cli/lfl.py" --email "${user_config.contact_email}
 2. **Run the batch** (rungs 0-1, and staging for rung 3):
 
    ```
-   python3 "${CLAUDE_PLUGIN_ROOT}/cli/lfl.py" --email "${user_config.contact_email}" fetch <DOIs...> \
-     --batch <short-name> --data "${CLAUDE_PLUGIN_DATA}" \
-     --proxy-mode "${user_config.proxy_mode}" --proxy-suffix "${user_config.proxy_suffix}"
+   python3 "${CLAUDE_PLUGIN_ROOT}/cli/lfl.py" fetch <DOIs...> --batch <short-name> \
+     --data "${CLAUDE_PLUGIN_DATA}"
    ```
 
    Add `--from-json /tmp/cands.json` to take DOIs from a discover result. Open-access PDFs land in

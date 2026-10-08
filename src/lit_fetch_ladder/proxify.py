@@ -10,13 +10,40 @@ This only rewrites addresses. Authentication comes from the saved library login
 that the plugin's library browser carries; nothing here sees a credential.
 """
 import os
+import re
 import urllib.parse
 
-from . import net
+from . import net, settings
+
+# The tail of a publisher host written the EZproxy way (www-example-com).
+PUBLISHER_TAIL = re.compile(r"-(com|org|net|edu|gov|io|info|int|uk|de|fr|jp|cn|au|ca|nl|ch|it|es|se|eu|in|kr|br|ru|pl)$")
+
+
+def normalize_suffix(raw):
+    """The proxy setting as people paste it: the bare ending (proxy.library.example.edu), the
+    address of a paper opened through the library (https://www-example-com.proxy.library.example.edu/...),
+    or the library's sign-in link (https://login.proxy.library.example.edu/login?url=...). Returns the
+    ending the proxy adds to publisher hostnames, or "". Same as proxySuffix in scripts/common.mjs."""
+    s = (raw or "").strip().lower()
+    if not s:
+        return ""
+    if "://" in s:
+        s = urllib.parse.urlsplit(s).hostname or ""
+    labels = re.split(r"[/?#]", s)[0].split(":")[0].strip(".").split(".")
+    if len(labels) > 2 and "-" in labels[0] and PUBLISHER_TAIL.search(labels[0]):
+        labels.pop(0)
+    if len(labels) > 2 and labels[0] == "login":
+        labels.pop(0)
+    return ".".join(labels)
+
+
+def configured_suffix(explicit=None):
+    """The proxy from the command line, LFL_PROXY_SUFFIX, or the plugin's settings; "" if none."""
+    return normalize_suffix(explicit or os.environ.get("LFL_PROXY_SUFFIX") or settings.plugin_option("proxy_suffix"))
 
 
 def suffix_from(explicit=None):
-    s = (explicit or os.environ.get("LFL_PROXY_SUFFIX") or "").strip().strip(".").lower()
+    s = configured_suffix(explicit)
     if not s:
         raise SystemExit("error: set your library's proxy suffix with --proxy-suffix or LFL_PROXY_SUFFIX "
                          "(for example proxy.library.example.edu; your library's site lists it)")

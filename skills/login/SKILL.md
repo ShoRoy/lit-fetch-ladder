@@ -9,20 +9,24 @@ disable-model-invocation: true
 The library browser carries a saved login, which you create yourself. The agent never runs this step
 and never sees your password or second factor. The plugin blocks the agent from running it.
 
-If your access mode is `none` (you are on a campus network or VPN), no login is needed. Your mode is
-**${user_config.proxy_mode}**.
+If you left "Library proxy" empty because publishers already recognise your network (a campus network
+or a library VPN), no login is needed. Your setting: "${user_config.proxy_suffix}"
 
 Otherwise, run this in your own terminal:
 
 ```
-node "${CLAUDE_PLUGIN_ROOT}/scripts/login.mjs" --data "${CLAUDE_PLUGIN_DATA}" \
-  --login-url "${user_config.proxy_login_url}" --proxy-suffix "${user_config.proxy_suffix}"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/login.mjs" --data "${CLAUDE_PLUGIN_DATA}"
 ```
 
-1. A browser window opens at your library's sign-in page. Sign in the way you normally do.
-2. Open one paper through the proxy to check you can read it.
+1. A browser window opens at your library's sign-in page, worked out from your proxy setting. Sign in
+   the way you normally do.
+2. Open one paper through your library to check you can read it.
 3. Close the window. Only the proxy's own cookies are saved; your sign-in provider's cookies are
    dropped, so the file cannot sign the browser in anywhere else. The file is readable only by you.
+
+If the window shows an error instead of your library's sign-in, go to your library's website in that
+window, sign in there and open a paper through it, then close the window. A library whose sign-in page
+lives somewhere else can be given it with `--login-url <address>`.
 
 Library sessions usually last a few hours. Run this again when fetches start landing on the sign-in
 page.

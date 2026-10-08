@@ -28,7 +28,7 @@ const ASK_RE = /^(click|drag|drop|fill_form|handle_dialog|hover|press_key|select
 const ALLOW = new Set(['close', 'console_messages', 'find', 'navigate', 'navigate_back',
   'network_requests', 'resize', 'snapshot', 'tabs', 'take_screenshot', 'wait_for']);
 
-// Hard ceilings. User settings may lower these, never raise them.
+// Hard ceilings, and the defaults. The environment may lower these, never raise them.
 const MAX_BURST = 20, MAX_DAILY = 60, MAX_PER_PAPER = 8;
 const STATE_FILE = 'lfl-guard-state.json';
 const IDLE_MS = 15 * 60 * 1000, DAY_MS = 24 * 3600 * 1000, APPROVAL_MS = DAY_MS;
@@ -45,12 +45,34 @@ function clampInt(v, lo, hi, dflt) {
   return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : dflt;
 }
 
+// The proxy setting as people paste it: the bare ending, the address of a paper opened through
+// the library, or the library's sign-in link. Returns the ending the proxy adds to publisher hostnames, or ''.
+// Same as proxySuffix in scripts/common.mjs, repeated so the guard stands alone.
+const PUBLISHER_TAIL = /-(com|org|net|edu|gov|io|info|int|uk|de|fr|jp|cn|au|ca|nl|ch|it|es|se|eu|in|kr|br|ru|pl)$/;
+export function proxySuffix(raw) {
+  let s = String(raw || '').trim().toLowerCase();
+  if (!s) return '';
+  if (s.includes('://')) {
+    try { s = new URL(s).hostname; } catch { /* not a URL after all; trimmed below */ }
+  }
+  const labels = s.split(/[/?#]/)[0].split(':')[0].replace(/^\.+|\.+$/g, '').split('.');
+  // A pasted paper address starts with the publisher's host written with dashes (www-example-com).
+  if (labels.length > 2 && labels[0].includes('-') && PUBLISHER_TAIL.test(labels[0])) labels.shift();
+  // A pasted sign-in link starts with login.
+  if (labels.length > 2 && labels[0] === 'login') labels.shift();
+  return labels.join('.');
+}
+
+// The user sets two things: a contact email and the proxy suffix. With no suffix the network
+// itself is entitled (campus or VPN), so there is no proxy and no saved login. The page-load
+// caps are fixed; the environment can only lower them, which the test suite uses, as it uses
+// the proxy_mode override.
 export function config() {
   const data = process.env.CLAUDE_PLUGIN_DATA || '';
-  const suffix = String(opt('proxy_suffix', '')).trim().toLowerCase().replace(/^\.+|\.+$/g, '');
+  const suffix = proxySuffix(opt('proxy_suffix', ''));
   return {
     data,
-    mode: String(opt('proxy_mode', 'ezproxy-host')).trim().toLowerCase(),
+    mode: String(opt('proxy_mode', suffix ? 'ezproxy-host' : 'none')).trim().toLowerCase(),
     suffix,
     burst: clampInt(opt('cap_burst', MAX_BURST), 1, MAX_BURST, MAX_BURST),
     daily: clampInt(opt('cap_daily', MAX_DAILY), 1, MAX_DAILY, MAX_DAILY),

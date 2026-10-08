@@ -12,7 +12,19 @@ import urllib.parse
 from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from lit_fetch_ladder import cli, discover, fetch, net, proxify, resolve  # noqa: E402
+from lit_fetch_ladder import cli, discover, fetch, net, proxify, resolve, settings  # noqa: E402
+
+
+# The tests never read the real Claude Code settings of whoever runs them.
+_settings = mock.patch.object(settings, "plugin_option", return_value=None)
+
+
+def setUpModule():
+    _settings.start()
+
+
+def tearDownModule():
+    _settings.stop()
 
 SUFFIX = "proxy.example.edu"
 CFG = {"email": "me@example.org", "mode": "ezproxy-host", "suffix": SUFFIX}
@@ -38,6 +50,18 @@ class Proxify(unittest.TestCase):
 
     def test_scheme_and_port(self):
         self.assertEqual(proxify.proxify_url("example.com:8443/p", SUFFIX), "https://example-com.%s:8443/p" % SUFFIX)
+
+    def test_pasted_settings_are_reduced_to_the_proxy(self):
+        cases = {
+            "https://login.proxy.example.edu/login?qurl=%u": SUFFIX,
+            "https://www-sciencedirect-com.proxy.example.edu/science/article/pii/S1": SUFFIX,
+            "onlinelibrary-wiley-com.proxy.example.edu/doi/10.1/x": SUFFIX,
+            "ezproxy-prd.bodleian.ox.ac.uk": "ezproxy-prd.bodleian.ox.ac.uk",
+            "https://www-jstor-org.ezproxy-prd.bodleian.ox.ac.uk/stable/1": "ezproxy-prd.bodleian.ox.ac.uk",
+            "": "",
+        }
+        for raw, want in cases.items():
+            self.assertEqual(proxify.normalize_suffix(raw), want, raw)
 
     def test_suffix_is_required(self):
         with mock.patch.dict(os.environ, {"LFL_PROXY_SUFFIX": ""}):
@@ -94,7 +118,8 @@ class Base(unittest.TestCase):
         p1 = mock.patch.object(resolve, "resolve", side_effect=fake_resolve(TABLE))
         p2 = mock.patch.object(proxify, "landing_url", side_effect=fake_landing)
         p1.start(), p2.start()
-        self.addCleanup(mock.patch.stopall)
+        self.addCleanup(p1.stop)  # not patch.stopall: that would also stop the module-wide settings stub
+        self.addCleanup(p2.stop)
         self.addCleanup(shutil.rmtree, self.tmp)
 
     def run_batch(self, ids, **kw):
@@ -236,11 +261,39 @@ class Privacy(unittest.TestCase):
         self.assertEqual(net.USER_AGENT, "lit-fetch-ladder/0.1.0")
 
 
+class Settings(unittest.TestCase):
+    def test_plugin_settings_are_read_user_then_project_then_local(self):
+        home, cwd = tempfile.mkdtemp(), tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, home)
+        self.addCleanup(shutil.rmtree, cwd)
+
+        def write(d, name, options):
+            os.makedirs(os.path.join(d, ".claude"), exist_ok=True)
+            with open(os.path.join(d, ".claude", name), "w") as fh:
+                json.dump({"pluginConfigs": {"lit-fetch-ladder@fetch-ladder": {"options": options},
+                                             "other@x": {"options": {"proxy_suffix": "not.this"}}}}, fh)
+        self.assertEqual(settings.plugin_options(cwd, home), {})
+        write(home, "settings.json", {"contact_email": "me@example.org", "proxy_suffix": "proxy.one.edu"})
+        write(cwd, "settings.local.json", {"proxy_suffix": "proxy.two.edu"})
+        self.assertEqual(settings.plugin_options(cwd, home), {"contact_email": "me@example.org", "proxy_suffix": "proxy.two.edu"})
+
+
 class Cli(unittest.TestCase):
     def test_fetch_without_suffix_in_proxy_mode_stops(self):
         with mock.patch.dict(os.environ, {"LFL_EMAIL": "me@example.org", "LFL_PROXY_SUFFIX": ""}):
             with self.assertRaises(SystemExit):
+                cli.main(["fetch", "10.1/x", "--batch", "b", "--proxy-mode", "ezproxy-host"])
+
+    def test_mode_follows_the_proxy_setting(self):
+        seen = []
+        with mock.patch.object(fetch, "run", side_effect=lambda ids, b, base, cfg, refresh=False: seen.append(cfg) or ({"batch": b, "items": []}, "m")), \
+                mock.patch.object(fetch, "report", return_value=""):
+            with mock.patch.dict(os.environ, {"LFL_EMAIL": "me@example.org", "LFL_PROXY_SUFFIX": ""}):
                 cli.main(["fetch", "10.1/x", "--batch", "b"])
+            with mock.patch.dict(os.environ, {"LFL_EMAIL": "me@example.org",
+                                              "LFL_PROXY_SUFFIX": "https://login.proxy.example.edu/login?url=x"}):
+                cli.main(["fetch", "10.1/x", "--batch", "b"])
+        self.assertEqual([(c["mode"], c["suffix"]) for c in seen], [("none", None), ("ezproxy-host", SUFFIX)])
 
 
 if __name__ == "__main__":

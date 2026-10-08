@@ -4,7 +4,7 @@ import json
 import os
 import sys
 
-from . import discover, fetch, net, proxify, resolve
+from . import discover, fetch, net, proxify, resolve, settings
 
 
 def _env(name, default=None):
@@ -42,7 +42,8 @@ def main(argv=None):
     f.add_argument("--batch", required=True)
     f.add_argument("--base", default=_env("LFL_BASE", "lit-fetch-runs"))
     f.add_argument("--data", default=_env("LFL_DATA"), help="plugin data directory (points the guard at this batch)")
-    f.add_argument("--proxy-mode", default=_env("LFL_PROXY_MODE", "ezproxy-host"), choices=fetch.MODES)
+    f.add_argument("--proxy-mode", default=_env("LFL_PROXY_MODE"), choices=fetch.MODES,
+                   help="default: ezproxy-host when a library proxy is set, otherwise none (campus or VPN)")
     f.add_argument("--proxy-suffix")
     f.add_argument("--pages-per-paper", type=int, default=fetch.DEFAULT_PAGES_PER_PAPER)
     f.add_argument("--refresh", action="store_true")
@@ -66,7 +67,8 @@ def main(argv=None):
         return 0
 
     if a.cmd == "mark":
-        row = fetch.mark(a.batch, a.base, a.doi, a.state, a.path, a.note, email=a.email or _env("LFL_EMAIL"))
+        row = fetch.mark(a.batch, a.base, a.doi, a.state, a.path, a.note,
+                         email=a.email or _env("LFL_EMAIL") or settings.plugin_option("contact_email"))
         print("marked %s -> %s%s" % (row["doi"], row["state"], "  (%s)" % row["path"] if row.get("path") else ""))
         return 0
 
@@ -115,8 +117,9 @@ def main(argv=None):
             ids += [r["doi"] for r in json.load(fh) if r.get("doi")]
     if not ids:
         ap.error("give DOIs/titles or --from-json")
-    cfg = {"email": email, "mode": a.proxy_mode, "data": a.data,
-           "suffix": proxify.suffix_from(a.proxy_suffix) if a.proxy_mode == "ezproxy-host" else None}
+    mode = a.proxy_mode or ("ezproxy-host" if proxify.configured_suffix(a.proxy_suffix) else "none")
+    cfg = {"email": email, "mode": mode, "data": a.data,
+           "suffix": proxify.suffix_from(a.proxy_suffix) if mode == "ezproxy-host" else None}
     manifest, mpath = fetch.run(ids, a.batch, a.base, cfg, refresh=a.refresh)
     print(fetch.report(manifest, mpath, a.pages_per_paper))
     return 0

@@ -3,13 +3,13 @@
 //   browse   rung 2, no credentials
 //   library  rung 3, the same server carrying the saved library login
 // The argument list is built here, in code: the plugin never passes --caps (which
-// adds cookie, storage and network-routing tools) and adds --user-agent only when
-// the user has set one. Note that this server version exposes two code-execution
+// adds cookie, storage and network-routing tools), and both browsers identify as the
+// desktop Chrome they are (see desktopUserAgent). Note that this server version exposes two code-execution
 // tools (browser_evaluate, browser_run_code_unsafe) even without --caps and has no
 // option to remove them; the plugin's guard denies both.
 import fs from 'node:fs';
 import path from 'node:path';
-import { PLAYWRIGHT_MCP, SESSION_FILE, npx } from './common.mjs';
+import { PLAYWRIGHT_MCP, SESSION_FILE, desktopUserAgent, npx, proxySuffix } from './common.mjs';
 
 const profile = process.argv[2];
 if (profile !== 'browse' && profile !== 'library') {
@@ -21,14 +21,14 @@ if (!data) {
   console.error('lit-fetch-ladder: CLAUDE_PLUGIN_DATA is not set');
   process.exit(2);
 }
-const ua = (process.env.LFL_USER_AGENT || '').trim();
-const mode = (process.env.LFL_PROXY_MODE || 'ezproxy-host').trim().toLowerCase();
+// With no proxy suffix the network itself is entitled (campus or VPN): no saved login to load.
+const suffix = proxySuffix(process.env.LFL_PROXY_SUFFIX);
 const outDir = path.join(data, 'downloads', profile);
 fs.mkdirSync(outDir, { recursive: true });
 
-const args = ['-y', PLAYWRIGHT_MCP, '--browser', 'chromium', '--isolated', '--headless', '--output-dir', outDir];
-if (ua) args.push('--user-agent', ua);
-if (profile === 'library' && mode !== 'none') args.push('--storage-state', path.join(data, ...SESSION_FILE));
+const args = ['-y', PLAYWRIGHT_MCP, '--browser', 'chromium', '--isolated', '--headless', '--output-dir', outDir,
+  '--user-agent', desktopUserAgent()];
+if (profile === 'library' && suffix) args.push('--storage-state', path.join(data, ...SESSION_FILE));
 
 const child = npx(args);
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => child.kill(sig));

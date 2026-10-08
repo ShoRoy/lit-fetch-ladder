@@ -4,7 +4,7 @@ import os
 import urllib.error
 import urllib.request
 
-from . import __version__
+from . import __version__, settings
 
 TIMEOUT = 25
 # Every request names the tool and nothing else. The contact email is not in it: only the
@@ -18,7 +18,7 @@ def contact_email(explicit=None):
     Unpaywall refuses requests without one, so a missing address is an error,
     never a silent default.
     """
-    email = (explicit or os.environ.get("LFL_EMAIL") or "").strip()
+    email = (explicit or os.environ.get("LFL_EMAIL") or settings.plugin_option("contact_email") or "").strip()
     if not email or "@" not in email:
         raise SystemExit("error: set a contact email with --email or LFL_EMAIL "
                          "(OpenAlex and Unpaywall ask for one; it is sent only to them)")

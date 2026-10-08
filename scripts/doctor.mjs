@@ -2,41 +2,25 @@
 // Check that everything lit-fetch-ladder needs is in place. Reads no secrets: for
 // the saved login it reports only whether the file exists and how old it is.
 //   node doctor.mjs --data <dir>
-// Settings are read from Claude Code's settings files (pluginConfigs), so the
-// command line never carries the proxy address; --email etc. override them.
+// The plugin's two settings are read from Claude Code's settings files (pluginConfigs), so
+// the command line never carries the proxy address; --email and --proxy-suffix override them.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { PLAYWRIGHT_MCP, SESSION_FILE, argValue } from './common.mjs';
+import { CHROME_MAJOR, PLAYWRIGHT_MCP, SESSION_FILE, argValue, pluginOptions, proxySuffix, signInUrl } from './common.mjs';
 import { hasDisplay } from './login.mjs';
 
 const rows = [];
 const check = (ok, label, hint = '') => rows.push(`${ok ? ' ok ' : 'FIX '} ${label}${!ok && hint ? `\n       -> ${hint}` : ''}`);
 
-// Non-sensitive plugin options live under pluginConfigs in the settings files;
-// later files (project, local) override earlier ones (user).
-function pluginOptions() {
-  const files = [path.join(os.homedir(), '.claude', 'settings.json'),
-    path.join(process.cwd(), '.claude', 'settings.json'),
-    path.join(process.cwd(), '.claude', 'settings.local.json')];
-  const opts = {};
-  for (const f of files) {
-    try {
-      const cfg = JSON.parse(fs.readFileSync(f, 'utf8')).pluginConfigs || {};
-      for (const [id, v] of Object.entries(cfg)) {
-        if (id.startsWith('lit-fetch-ladder@')) Object.assign(opts, v.options || {});
-      }
-    } catch { /* missing or unreadable settings file */ }
-  }
-  return opts;
-}
+const note = (label) => rows.push(`     ${label}`);
+
 const o = pluginOptions();
 const data = argValue('--data');
 const email = argValue('--email', o.contact_email || '');
-const mode = argValue('--proxy-mode', o.proxy_mode || 'ezproxy-host');
-const suffix = argValue('--proxy-suffix', o.proxy_suffix || '');
-const loginUrl = argValue('--login-url', o.proxy_login_url || '');
+const rawProxy = argValue('--proxy-suffix', o.proxy_suffix || '').trim();
+const suffix = proxySuffix(rawProxy);
 
 const nodeMajor = Number(process.versions.node.split('.')[0]);
 check(nodeMajor >= 18, `Node ${process.versions.node}`, 'install Node 18 or later');
@@ -52,11 +36,16 @@ const cacheRoots = [process.env.PLAYWRIGHT_BROWSERS_PATH,
 const chromium = cacheRoots.some((r) => fs.existsSync(r) && fs.readdirSync(r).some((d) => d.startsWith('chromium')));
 check(chromium, 'Chromium for Playwright installed', `npx -y -p ${PLAYWRIGHT_MCP} playwright install chromium`);
 
-check(/.+@.+/.test(email), 'contact email set', 'set contact_email in /plugin settings for lit-fetch-ladder');
-check(['ezproxy-host', 'none'].includes(mode), `proxy mode: ${mode}`, 'use ezproxy-host or none');
-if (mode === 'ezproxy-host') {
-  check(!!suffix, `proxy suffix: ${suffix || '(empty)'}`, "set proxy_suffix (your library's site lists it, e.g. proxy.library.example.edu)");
-  check(/^https:\/\//.test(loginUrl), 'proxy login URL set', 'set proxy_login_url to the address that starts your library sign-in');
+check(/.+@.+/.test(email), 'contact email set', 'set "Your email" in /config under lit-fetch-ladder (Unpaywall requires one)');
+note(`the browsers identify as desktop Chrome ${CHROME_MAJOR}, without the word "Headless"`);
+if (!suffix) {
+  note('no library proxy set: the library browser opens publisher sites directly, which works on a');
+  note('campus network or VPN. Set "Library proxy" in /config to sign in from anywhere else.');
+} else {
+  check(true, `library proxy: ${suffix}${rawProxy.toLowerCase() !== suffix ? `  (taken from "${rawProxy}")` : ''}`);
+  const url = await signInUrl(suffix);
+  check(!!url, `library sign-in page: ${url || 'not found'}`,
+    `neither login.${suffix} nor ${suffix} answers; check the proxy setting, or pass --login-url to the login command`);
   const sess = data && path.join(data, ...SESSION_FILE);
   if (sess && fs.existsSync(sess)) {
     const st = fs.statSync(sess);

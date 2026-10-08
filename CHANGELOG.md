@@ -15,6 +15,11 @@ First release.
   asks before unapproved sites; per-paper budget, 20 loads per burst, 60 per 24 hours; protects the
   saved login and its own state; blocks proxied addresses outside the browser and the agent running
   the sign-in.
+- Two settings: your email, and your library proxy. Paste a paper's address or the library's sign-in
+  link and the plugin keeps the proxy's part; leave it empty on an entitled network (campus or VPN).
+  The sign-in page is worked out from the proxy. The scripts read both settings themselves, so no
+  command line carries the proxy.
+- Both browsers identify as desktop Chrome of the bundled version, without "Headless".
 - Login keeps only the proxy's cookies.
 - The contact email goes only to OpenAlex and Unpaywall, in the parameter each asks for. Every other
   request (doi.org, open-access hosts) names the tool and nothing else.

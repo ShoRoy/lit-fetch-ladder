@@ -26,16 +26,12 @@ guard around it.
 /plugin install lit-fetch-ladder@fetch-ladder
 ```
 
-Claude Code then asks for the plugin's settings:
+Claude Code then asks for two settings, which you can change later in `/config`:
 
 | Setting | What to enter |
 |---|---|
-| Contact email | sent only to OpenAlex and Unpaywall, in the request parameter each asks for (Unpaywall requires one) |
-| Library access mode | `ezproxy-host` if your library proxy rewrites hostnames (`www-example-com.proxy.library.example.edu`); `none` if your network is already entitled (campus or VPN) |
-| Library proxy suffix | e.g. `proxy.library.example.edu`. Your library's website lists it, and so do Zotero's and Lean Library's settings |
-| Library sign-in URL | the address that starts your library sign-in, e.g. `https://login.proxy.library.example.edu/login?url=https://www.example.com/` |
-| User-agent (optional) | empty for Playwright's default |
-| Caps | leave the defaults; see "Limits" below |
+| Your email | Any address of yours. Unpaywall, which finds legal open-access copies, requires one, and OpenAlex asks for one. They are the only two services it is sent to. |
+| Library proxy | Open any paywalled paper through your library's website and paste the address from the address bar, for example `https://www-sciencedirect-com.proxy.library.example.edu/science/article/...`. The plugin keeps only your library's part, here `proxy.library.example.edu`, and the doctor shows what it kept. Your library's sign-in link works too. Leave it empty on a campus network or library VPN that publishers already recognise; no library sign-in is then needed. |
 
 Then install the browser once and check the setup:
 
@@ -54,8 +50,11 @@ Windows should work but are untested; reports are welcome.
 ```
 
 The skill shows you a command to run **in your own terminal**. The agent never runs it, and the plugin
-blocks it from trying. A browser window opens at your library's sign-in page; sign in as you normally
-do, open one paper to check access, and close the window. Only the proxy's own cookies are saved. The
+blocks it from trying. A browser window opens at your library's sign-in page, which the plugin works out
+from your proxy setting; sign in as you normally do, open one paper to check access, and close the
+window. If the window shows an error instead, go to your library's website in that window, sign in,
+open a paper through it and close the window. A library whose sign-in page lives elsewhere can be given
+it with `--login-url <address>`. Only the proxy's own cookies are saved. The
 sign-in provider's cookies (single sign-on, second factor) are dropped, so the saved file cannot sign
 the browser in anywhere except the proxy. The file lives in the plugin's data directory, readable only
 by you. Library sessions usually last a few hours; run the login again when fetches land on the
@@ -76,8 +75,9 @@ the window will open.
   -e DISPLAY -e WAYLAND_DISPLAY -e XDG_RUNTIME_DIR` to `docker run`.
 - **macOS with Docker:** install XQuartz, enable "Allow connections from network clients", run
   `xhost +localhost`, and start the container with `-e DISPLAY=host.docker.internal:0`.
-- **SSH or a headless server:** run the login command on your own machine with a temporary `--data`
-  directory, then copy `secret/library-state.json` into the plugin's data directory on the server
+- **SSH or a headless server:** on your own machine, run the login command from a copy of this
+  repository with a temporary `--data` directory and `--proxy-suffix <your library proxy>` (that
+  machine has no plugin settings to read), then copy `secret/library-state.json` into the plugin's data directory on the server
   (`chmod 600` it).
 
 ## Use
@@ -179,8 +179,8 @@ deny   click a link once the batch budget is spent
 
 Publishers watch for systematic downloading through library proxies, and the usual response is to
 suspend the library's access for everyone at the institution, not only for the person who caused it.
-The defaults (5 page loads per approved paper, 20 per burst, 60 per 24 hours) cover a careful survey
-and stop a runaway one. Settings can lower them; the code caps them at those values. Use this for
+The limits (5 page loads per approved paper, 20 per burst, 60 per 24 hours) cover a careful survey and
+stop a runaway one. They are fixed in `guard/guard.mjs`; lower them there if you want them tighter. Use this for
 your own research, on papers you name, with access your library already gives you.
 
 This is open source and you can change any of it. If you raise the caps or remove a safeguard, the
@@ -205,8 +205,9 @@ without them is not recommended.
 
 Your contact email goes only to OpenAlex and Unpaywall, in the request parameter each asks for.
 Every other request the tools make, to doi.org and to open-access hosts, identifies itself only as
-`lit-fetch-ladder/<version>`. The browsers talk to the sites they open. Nothing is sent to the author
-of this plugin.
+`lit-fetch-ladder/<version>`. The browsers talk to the sites they open, and identify themselves as the
+desktop Chrome they are, without the word "Headless" that first-line bot checks refuse. Nothing else
+about them is disguised. Nothing is sent to the author of this plugin.
 
 ## Uninstall and data
 

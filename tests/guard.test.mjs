@@ -345,6 +345,20 @@ test('daily cap stops page loads, and settings cannot raise any cap above its ce
   }
 });
 
+test('an empty proxy setting means an entitled network; a pasted link is reduced to the proxy', () => {
+  const keys = ['CLAUDE_PLUGIN_OPTION_PROXY_SUFFIX', 'CLAUDE_PLUGIN_OPTION_PROXY_MODE'];
+  const saved = keys.map((k) => process.env[k]);
+  try {
+    delete process.env.CLAUDE_PLUGIN_OPTION_PROXY_MODE;
+    process.env.CLAUDE_PLUGIN_OPTION_PROXY_SUFFIX = '';
+    assert.equal(config().mode, 'none');
+    process.env.CLAUDE_PLUGIN_OPTION_PROXY_SUFFIX = `https://www-sciencedirect-com.${SUFFIX}/science/article/pii/S1`;
+    assert.deepEqual([config().mode, config().suffix], ['ezproxy-host', SUFFIX]);
+  } finally {
+    keys.forEach((k, i) => { if (saved[i] === undefined) delete process.env[k]; else process.env[k] = saved[i]; });
+  }
+});
+
 test('unreadable guard state fails closed', () => {
   const sb = sandbox();
   fs.mkdirSync(path.join(sb.data, 'state'), { recursive: true });
@@ -449,8 +463,10 @@ test('every command the skills tell the agent to run passes the guard', () => {
   const values = {
     CLAUDE_PLUGIN_ROOT: '/home/u/.claude/plugins/cache/fetch-ladder/lit-fetch-ladder/0.1.0',
     CLAUDE_PLUGIN_DATA: '/home/u/.claude/plugins/data/lit-fetch-ladder-fetch-ladder',
-    'user_config.contact_email': 'me@example.org', 'user_config.proxy_mode': 'ezproxy-host',
-    'user_config.proxy_suffix': SUFFIX, 'user_config.proxy_login_url': `https://login.${SUFFIX}/login?url=https://www.example.com/`,
+    'user_config.contact_email': 'me@example.org',
+    // A pasted sign-in link as the proxy setting. No command the agent runs may carry it: the
+    // guard would refuse the command, since it names a proxied address.
+    'user_config.proxy_suffix': `https://login.${SUFFIX}/login?url=https://www.example.com/`,
   };
   for (const skill of ['fetch', 'doctor', 'sites']) {
     const md = fs.readFileSync(path.join(root, 'skills', skill, 'SKILL.md'), 'utf8');

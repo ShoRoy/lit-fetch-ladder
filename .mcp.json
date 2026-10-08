@@ -2,13 +2,12 @@
   "mcpServers": {
     "browse": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-server.mjs", "browse"],
-      "env": { "LFL_USER_AGENT": "${user_config.user_agent}" }
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-server.mjs", "browse"]
     },
     "library": {
       "command": "node",
       "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-server.mjs", "library"],
-      "env": { "LFL_USER_AGENT": "${user_config.user_agent}", "LFL_PROXY_MODE": "${user_config.proxy_mode}" }
+      "env": { "LFL_PROXY_SUFFIX": "${user_config.proxy_suffix}" }
     }
   }
 }

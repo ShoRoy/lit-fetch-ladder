@@ -3,58 +3,31 @@
   "displayName": "Lit Fetch Ladder",
   "version": "0.1.0",
   "description": "Fetch papers for a literature survey, open access first: discovery, open-access download, a headless browser, then the same browser carrying your library login, with prompt-injection safeguards enforced as hooks.",
-  "author": { "name": "Shobhan Roy" },
+  "author": {
+    "name": "Shobhan Roy"
+  },
   "repository": "https://github.com/ShoRoy/lit-fetch-ladder",
   "license": "MIT",
-  "keywords": ["literature-review", "research", "open-access", "playwright", "ezproxy", "prompt-injection"],
+  "keywords": [
+    "literature-review",
+    "research",
+    "open-access",
+    "playwright",
+    "ezproxy",
+    "prompt-injection"
+  ],
   "userConfig": {
     "contact_email": {
       "type": "string",
-      "title": "Contact email",
-      "description": "Sent only to OpenAlex and Unpaywall, which ask for a contact address (Unpaywall requires one).",
+      "title": "Your email",
+      "description": "Unpaywall, the free service that finds legal open-access copies of papers, requires an email address, and OpenAlex, which the plugin searches for papers, asks for one. These two services are the only places it is sent. Any address of yours works.",
       "required": true
-    },
-    "proxy_mode": {
-      "type": "string",
-      "title": "Library access mode",
-      "description": "ezproxy-host: your library proxy rewrites hostnames (www-example-com.<suffix>). none: your network is already entitled (campus or VPN), no proxy and no saved login.",
-      "default": "ezproxy-host"
     },
     "proxy_suffix": {
       "type": "string",
-      "title": "Library proxy suffix",
-      "description": "The part your library's proxy adds to publisher hostnames, e.g. proxy.library.example.edu. Your library's website, or your Zotero / Lean Library settings, list it.",
+      "title": "Library proxy (leave empty on campus)",
+      "description": "Lets the logged-in browser reach paywalled papers through your library. Open any paywalled paper through your library's website and paste the address from the address bar, for example https://www-sciencedirect-com.proxy.library.example.edu/science/article/...; the plugin keeps only your library's part (proxy.library.example.edu). Your library's sign-in link works too. Leave it empty if publishers already recognise your network, as on a campus network or a library VPN; no library sign-in is then needed.",
       "default": ""
-    },
-    "proxy_login_url": {
-      "type": "string",
-      "title": "Library sign-in URL",
-      "description": "The address that starts your library sign-in, e.g. https://login.proxy.library.example.edu/login?url=https://www.example.com/",
-      "default": ""
-    },
-    "user_agent": {
-      "type": "string",
-      "title": "Browser user-agent (optional)",
-      "description": "Leave empty for Playwright's default. A normal desktop string gets past soft bot checks on some publisher pages; it does not defeat real bot protection and is not meant to.",
-      "default": ""
-    },
-    "cap_burst": {
-      "type": "number",
-      "title": "Library page loads per burst",
-      "description": "Authenticated page loads allowed before a 15-minute pause resets the count. At most 20.",
-      "default": 20, "min": 1, "max": 20
-    },
-    "cap_daily": {
-      "type": "number",
-      "title": "Library page loads per 24 hours",
-      "description": "Rolling 24-hour limit on authenticated page loads. At most 60.",
-      "default": 60, "min": 1, "max": 60
-    },
-    "pages_per_paper": {
-      "type": "number",
-      "title": "Page loads per approved paper",
-      "description": "A batch may use at most this many authenticated page loads per paper you approved. At most 8.",
-      "default": 5, "min": 1, "max": 8
     }
   }
 }
