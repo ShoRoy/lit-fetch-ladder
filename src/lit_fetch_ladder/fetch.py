@@ -174,6 +174,18 @@ def report(manifest, mpath, pages_per_paper=DEFAULT_PAGES_PER_PAPER):
     return "\n".join(lines)
 
 
+REFERENCES = re.compile(r"\b(references|bibliography|literature cited|works cited)\b", re.I)
+ABSTRACT_ONLY_WARNING = ("the saved text has no references section, so it may be the abstract only "
+                         "(many publishers load the article body after the page)")
+
+
+def has_references(path):
+    """Whether a saved article text reaches its reference list. A page saved before the publisher
+    loaded the body holds the abstract and little else."""
+    with open(path, encoding="utf-8", errors="ignore") as fh:
+        return bool(REFERENCES.search(fh.read()))
+
+
 def openalex_abstract(doi, email):
     js, err = net.get("https://api.openalex.org/works/doi:%s?mailto=%s&select=abstract_inverted_index"
                       % (urllib.parse.quote(doi), urllib.parse.quote(email)))
@@ -209,6 +221,11 @@ def mark(batch, base, doi, state, path=None, note=None, email=None):
             shutil.copy2(path, dest)
         row.update(path=dest, sha256=sha256(dest), kind="pdf" if is_pdf else "fulltext")
     row["state"] = state
+    # Saved page text is checked, so an abstract-only snapshot cannot pass silently for the paper.
+    row.pop("warning", None)
+    if state == "PROXY_FETCHED" and row.get("kind") == "fulltext" and row.get("path") \
+            and not has_references(row["path"]):
+        row["warning"] = ABSTRACT_ONLY_WARNING
     if note is not None:
         row["note"] = note
     if state == "ABSTRACT_ONLY" and not row.get("abstract") and email:

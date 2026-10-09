@@ -30,6 +30,8 @@ const args = ['-y', PLAYWRIGHT_MCP, '--browser', 'chromium', '--isolated', '--he
   '--user-agent', desktopUserAgent()];
 if (profile === 'library' && suffix) args.push('--storage-state', path.join(data, ...SESSION_FILE));
 
-const child = npx(args);
+// Run the server inside its download folder: a snapshot or screenshot the agent saves under a short
+// file name lands there, never loose in the user's project.
+const child = npx(args, { cwd: outDir });
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => child.kill(sig));
 child.on('exit', (code, sig) => process.exit(code ?? (sig ? 1 : 0)));

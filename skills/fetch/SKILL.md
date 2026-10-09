@@ -78,20 +78,27 @@ on the command line.
      `/lit-fetch-ladder:login`. Do not run it yourself; the plugin blocks it.
    - **Article page:** get the PDF if the page offers one. A file download lands in
      `${CLAUDE_PLUGIN_DATA}/downloads/library/`. If the publisher shows only an in-page viewer, save the
-     article's full text from the page snapshot instead. Then record it:
+     article's full text from the page snapshot instead. Many publishers load the article body a few
+     seconds after the page, so first `browser_wait_for` the reference list's heading (for example the
+     text "References"); waiting loads no page and costs nothing. Then take the snapshot with a short file
+     name, which saves it in `${CLAUDE_PLUGIN_DATA}/downloads/library/`, and check that it holds the
+     article's sections and reference list, not only the abstract. Then record it:
 
      ```
      python3 "${CLAUDE_PLUGIN_ROOT}/cli/lfl.py" mark <DOI> --batch <name> --state PROXY_FETCHED \
        --path <downloaded file or saved text> [--note "viewer only; PDF is a manual export"]
      ```
 
+     `mark` warns, and notes it in the manifest, when saved text has no references section. If the body
+     never loads, mark the paper `ABSTRACT_ONLY` with a note saying so; never record an abstract as the
+     paper.
    - **The proxy will not serve it** (a proxy error page, not the sign-in page):
      `lfl mark <DOI> --batch <name> --state ABSTRACT_ONLY` (the abstract is kept). Write this only
      after a real attempt; never infer it.
    - **Resolved to the wrong paper:** `lfl mark <DOI> --batch <name> --state EXCLUDED --note "..."`.
 5. **Report.** From `lfl show --batch <name>`: a table (title, year, how it was obtained, file, DOI)
    and the list of papers the batch could not get, each with its state. Point out any paper that came
-   from a bare title so the user can check it is the right one.
+   from a bare title so the user can check it is the right one, and any row carrying a `warning`.
 
 ## When something stops
 

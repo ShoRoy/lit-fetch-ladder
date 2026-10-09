@@ -23,6 +23,10 @@ First release.
 - `/lit-fetch-ladder:login` opens the sign-in window itself, in the background, and the login is saved
   when the window closes; only the user can run it. The terminal command remains the fallback.
 - Login keeps only the proxy's cookies.
+- Saved page text is checked: `lfl mark` warns, and notes in the manifest, when it has no references
+  section, since many publishers load the article body after the page. The fetch skill waits for the
+  body before saving. Each browser server runs in its own download folder, so a snapshot saved under a
+  short file name never lands loose in the user's project.
 - Nothing runs at session start, so sessions that never fetch a paper see nothing from the plugin.
   The README recommends installing it for the one folder used for literature surveys.
 - The contact email goes only to OpenAlex and Unpaywall, in the parameter each asks for. Every other

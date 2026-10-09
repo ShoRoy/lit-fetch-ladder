@@ -197,6 +197,24 @@ class Mark(Base):
         self.assertTrue(row["path"].startswith(os.path.join(self.tmp, "b1", "fulltext")))
         self.assertEqual(row["kind"], "fulltext")
 
+    def test_a_page_saved_before_the_body_loaded_is_flagged(self):
+        self.run_batch(["10.1/paywalled"])
+        dl = os.path.join(self.tmp, "downloads")
+        os.makedirs(dl)
+        page = os.path.join(dl, "page.md")
+        with open(page, "w") as fh:  # what a snapshot taken too early holds
+            fh.write("heading Abstract ... heading Keywords ... heading Recommended articles")
+        row = fetch.mark("b1", self.tmp, "10.1/paywalled", "PROXY_FETCHED", path=page)
+        self.assertEqual(row["warning"], fetch.ABSTRACT_ONLY_WARNING)
+        with open(page, "w") as fh:  # the same page once the body has loaded
+            fh.write("heading 1. Introduction ... heading 3. Numerical algorithms ... heading References")
+        row = fetch.mark("b1", self.tmp, "10.1/paywalled", "PROXY_FETCHED", path=page)
+        self.assertNotIn("warning", row)
+        pdf = os.path.join(dl, "p.pdf")
+        with open(pdf, "wb") as fh:  # a PDF is the paper itself and is not checked
+            fh.write(b"%PDF-1.4 y")
+        self.assertNotIn("warning", fetch.mark("b1", self.tmp, "10.1/paywalled", "PROXY_FETCHED", path=pdf))
+
     def test_abstract_only_keeps_the_abstract(self):
         self.run_batch(["10.1/paywalled"])
         with mock.patch.object(fetch, "openalex_abstract", return_value="An abstract."):

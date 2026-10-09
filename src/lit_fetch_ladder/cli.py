@@ -70,6 +70,8 @@ def main(argv=None):
         row = fetch.mark(a.batch, a.base, a.doi, a.state, a.path, a.note,
                          email=a.email or _env("LFL_EMAIL") or settings.plugin_option("contact_email"))
         print("marked %s -> %s%s" % (row["doi"], row["state"], "  (%s)" % row["path"] if row.get("path") else ""))
+        if row.get("warning"):
+            print("WARNING: %s. Wait for the article body and save the page again, or mark it ABSTRACT_ONLY." % row["warning"])
         return 0
 
     email = net.contact_email(a.email)
