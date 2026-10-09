@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // lit-fetch-ladder guard: the plugin's safeguards, run as one hook script for
-// PreToolUse, PostToolUse and SessionStart. No dependencies; Node 18 or later.
+// PreToolUse and PostToolUse. No dependencies; Node 18 or later. It registers nothing at
+// session start, so a session that never fetches a paper sees nothing from it.
 //
 // What it enforces:
 //   1. Browser tools that run code, touch cookies/storage, read raw network
@@ -171,7 +172,11 @@ export function withLock(cfg, fn) {
 export function loadState(cfg) {
   const file = path.join(cfg.stateDir, STATE_FILE);
   if (!fs.existsSync(file)) return { approvals: [], loads: [], burst: { last: 0, count: 0 } };
-  return readJson(file);  // unreadable state throws: the caller fails closed
+  try {
+    return readJson(file);
+  } catch {  // the caller fails closed; the message says how to recover
+    throw new Error(`the guard state is unreadable; delete ${file} to reset the page counts`);
+  }
 }
 
 export function saveState(cfg, st) {
@@ -595,30 +600,12 @@ function pageKey(u) {
   }
 }
 
-function sessionStart(cfg) {
-  const problems = [];
-  if (!cfg.data) problems.push('CLAUDE_PLUGIN_DATA is not set; the guard cannot keep state.');
-  if (!['ezproxy-host', 'none'].includes(cfg.mode)) problems.push(`proxy_mode "${cfg.mode}" is not supported (use ezproxy-host or none).`);
-  if (cfg.mode === 'ezproxy-host' && !cfg.suffix) problems.push('proxy_suffix is empty; the library browser stays disabled until it is set.');
-  if (cfg.mode !== 'none' && cfg.sessionFile && fs.existsSync(cfg.sessionFile)) {
-    const age = (Date.now() - fs.statSync(cfg.sessionFile).mtimeMs) / 3600000;
-    if (age > 12) problems.push(`saved library login is ${Math.round(age)} h old and has probably expired; run /lit-fetch-ladder:login.`);
-  }
-  try {
-    if (cfg.stateDir) loadState(cfg);
-  } catch {
-    problems.push(`guard state is unreadable (${path.join(cfg.stateDir, STATE_FILE)}); the library browser is blocked until it is deleted.`);
-  }
-  return problems.length ? { systemMessage: `lit-fetch-ladder: ${problems.join(' ')}` } : null;
-}
-
 export function handle(ev, now = Date.now()) {
   const cfg = config();
   switch (ev.hook_event_name) {
     case 'PreToolUse': return preToolUse(cfg, ev, now);
     case 'PostToolUse':
     case 'PostToolUseFailure': return postToolUse(cfg, ev, now);
-    case 'SessionStart': return sessionStart(cfg);
     default: return null;
   }
 }

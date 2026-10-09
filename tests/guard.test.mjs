@@ -366,6 +366,7 @@ test('unreadable guard state fails closed', () => {
   const r = run(sb, libNav(libUrl('www-examplepub-com')));
   assert.equal(r.decision, 'deny');
   assert.match(r.reason, /failing closed/);
+  assert.match(r.reason, /delete .* to reset the page counts/);
 });
 
 test('malformed hook input fails closed', () => {
@@ -401,7 +402,7 @@ test('ordinary file and shell use is untouched', () => {
   assert.equal(run(sb, pre('Read', { file_path: path.join(sb.data, 'downloads', 'paper.pdf') })).decision, 'none');
 });
 
-// ---------------------------------------------------------------- mode none and session start
+// ---------------------------------------------------------------- mode none, and nothing at session start
 
 test('proxy_mode none: no saved login needed, batch sites are matched directly', () => {
   const sb = sandbox({ session: false, opts: { proxy_mode: 'none', proxy_suffix: '', pages_per_paper: 5 } });
@@ -415,14 +416,12 @@ test('proxy_mode none: no saved login needed, batch sites are matched directly',
   assert.equal(run(sb, nav('https://elsewhere.example/x')).decision, 'ask');
 });
 
-test('session start is quiet when configured and speaks up when not', () => {
-  const ok = sandbox();
-  assert.equal(run(ok, { hook_event_name: 'SessionStart' }).decision, 'none');
+test('the plugin does nothing at session start, so sessions that never fetch see nothing', () => {
+  const hooks = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'hooks', 'hooks.json'), 'utf8')).hooks;
+  assert.deepEqual(Object.keys(hooks).sort(), ['PostToolUse', 'PostToolUseFailure', 'PreToolUse']);
   const bad = sandbox();
   bad.env.CLAUDE_PLUGIN_OPTION_PROXY_SUFFIX = '';
-  const r = run(bad, { hook_event_name: 'SessionStart' });
-  assert.equal(r.decision, 'message');
-  assert.match(r.reason, /proxy_suffix is empty/);
+  assert.equal(run(bad, { hook_event_name: 'SessionStart' }).decision, 'none');
 });
 
 test('EZproxy host decoding: a hyphen in the original host is written as "--"', () => {

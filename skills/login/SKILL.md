@@ -1,40 +1,33 @@
 ---
 name: login
-description: Save or renew the library login used by lit-fetch-ladder's library browser. Shows the user the command to run in their own terminal; the agent never runs it.
+description: Sign in to your library for lit-fetch-ladder's library browser. Opens your library's sign-in page in a browser window. Only the user can run this; the agent cannot invoke it.
 disable-model-invocation: true
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/login.mjs" *)
 ---
 
-# Save your library login
+# Sign in to your library
 
-The library browser carries a saved login, which you create yourself. The agent never runs this step
-and never sees your password or second factor. The plugin blocks the agent from running it.
+!`node "${CLAUDE_PLUGIN_ROOT}/scripts/login.mjs" --data "${CLAUDE_PLUGIN_DATA}" --background`
 
-If you left "Library proxy" empty because publishers already recognise your network (a campus network
-or a library VPN), no login is needed. Your setting: "${user_config.proxy_suffix}"
+The line above, printed by the plugin, says what happened. Tell the user in two or three sentences:
 
-Otherwise, run this in your own terminal:
+- **OPENING**: a browser window is opening at their library's sign-in page. They sign in the way they
+  normally do, open one paper through the library to check they can read it, and close the window.
+  The login is saved when the window closes; `/lit-fetch-ladder:doctor` then shows its age. Only the
+  proxy's own cookies are kept, and the file is readable only by them.
+- **ALREADY OPEN**: a sign-in window is already open; they finish signing in there.
+- **NOT OPENED**, or no status line: pass on the reason, then show them this command to run in their
+  own terminal. It opens the same window and waits until they close it:
 
-```
-node "${CLAUDE_PLUGIN_ROOT}/scripts/login.mjs" --data "${CLAUDE_PLUGIN_DATA}"
-```
+  ```
+  node "${CLAUDE_PLUGIN_ROOT}/scripts/login.mjs" --data "${CLAUDE_PLUGIN_DATA}"
+  ```
 
-1. A browser window opens at your library's sign-in page, worked out from your proxy setting. Sign in
-   the way you normally do.
-2. Open one paper through your library to check you can read it.
-3. Close the window. Only the proxy's own cookies are saved; your sign-in provider's cookies are
-   dropped, so the file cannot sign the browser in anywhere else. The file is readable only by you.
+  Without a display (an SSH session, a plain Docker container, a headless server), point them to
+  "Signing in from a container" in the README.
 
-If the window shows an error instead of your library's sign-in, go to your library's website in that
-window, sign in there and open a paper through it, then close the window. A library whose sign-in page
-lives somewhere else can be given it with `--login-url <address>`.
+If the window shows an error instead of the library's sign-in, they go to their library's website in
+that window, sign in there, open a paper through it and close the window. A library whose sign-in page
+lives elsewhere can be given it with `--login-url <address>` on the terminal command.
 
-Library sessions usually last a few hours. Run this again when fetches start landing on the sign-in
-page.
-
-**No window appears?** The sign-in needs a display. In a VS Code dev container on Windows (WSLg) or
-Linux, display forwarding is usually already set up. In a plain Docker container, an SSH session or
-a headless server, see "Signing in from a container" in the README, or run the command on your own
-machine and copy the saved file across.
-
-When reporting back to the user, show them the command above with the values filled in and these
-steps. Do not run the command.
+Do not run any command yourself. A sign-in is started by the user, never by the agent.

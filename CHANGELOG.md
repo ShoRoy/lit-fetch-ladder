@@ -20,7 +20,11 @@ First release.
   The sign-in page is worked out from the proxy. The scripts read both settings themselves, so no
   command line carries the proxy.
 - Both browsers identify as desktop Chrome of the bundled version, without "Headless".
+- `/lit-fetch-ladder:login` opens the sign-in window itself, in the background, and the login is saved
+  when the window closes; only the user can run it. The terminal command remains the fallback.
 - Login keeps only the proxy's cookies.
+- Nothing runs at session start, so sessions that never fetch a paper see nothing from the plugin.
+  The README recommends installing it for the one folder used for literature surveys.
 - The contact email goes only to OpenAlex and Unpaywall, in the parameter each asks for. Every other
   request (doi.org, open-access hosts) names the tool and nothing else.
 - Batch approval names every site (registrable domain) the logged-in browser will open, with paper

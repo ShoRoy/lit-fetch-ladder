@@ -13,6 +13,10 @@ them that the README does not describe:
 
 - The shell check on the saved login is a pattern match. A command that reconstructs the path to
   hide it can slip past it. The file tools (Read, Edit, Grep, Glob) are checked by resolved path.
+- The shell check on the sign-in script is a pattern match too. A command that starts the sign-in
+  another way, including a second Claude Code started from the shell, can slip past it. It cannot sign
+  in for the user: that needs their password and second factor in a window on their screen. Users
+  should sign in only to a window they opened with `/lit-fetch-ladder:login`.
 - A redirect inside one page load cannot be stopped. The site it lands on is not trusted: the next
   navigation there asks the user.
 - A page load is counted when the agent navigates, or when a click or key press in the logged-in

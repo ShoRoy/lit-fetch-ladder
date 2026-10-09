@@ -1,20 +1,25 @@
 #!/usr/bin/env node
-// Save a library login for the plugin's library browser. Run this yourself, in a
-// terminal; the agent never runs it and never sees your password or second factor.
+// Save a library login for the plugin's library browser. The agent never sees your password or
+// second factor: you sign in yourself, in a browser window on your screen.
 //
+//   /lit-fetch-ladder:login        in Claude Code (only you can run it; the agent cannot)
 //   node login.mjs --data <plugin data dir> [--proxy-suffix <library proxy>] [--login-url <sign-in page>]
+//
+// The slash command runs this with --background: it starts a second, detached copy that opens the
+// window and saves the login when you close it, and returns at once, because Claude Code stops a
+// slash command's command after two minutes. Run by hand, it opens the window and waits.
 //
 // The library proxy comes from the plugin's settings; --proxy-suffix overrides it (for signing in
 // on a machine where the plugin is not installed). The sign-in page is the proxy's own login
 // page, worked out from the proxy; --login-url overrides it for a library that differs.
 //
-// A browser window opens at your library's sign-in page. Sign in the way you
-// normally do, open any paper through the proxy to confirm it works, then close
-// the window. Only the proxy's own cookies are kept: the sign-in provider's
-// cookies (single sign-on, second factor) are dropped, so the saved file cannot
-// sign the agent's browser in anywhere except the library proxy.
+// Only the proxy's own cookies are kept: the sign-in provider's cookies (single sign-on, second
+// factor) are dropped, so the saved file cannot sign the agent's browser in anywhere except the
+// library proxy.
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { PLAYWRIGHT_MCP, SESSION_FILE, argValue, npx, pluginOptions, proxySuffix, signInUrl, underSuffix } from './common.mjs';
 
 export function scopeState(state, suffix) {
@@ -39,29 +44,49 @@ export function hasDisplay(env = process.env, platform = process.platform) {
   return platform !== 'linux' || !!(env.DISPLAY || env.WAYLAND_DISPLAY);
 }
 
+function isAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === 'EPERM';
+  }
+}
+
 async function main() {
+  const background = process.argv.includes('--background');
+  // In the background (the slash command) a failing exit would abort the command before the user
+  // saw why, so every outcome there is a status line and the exit is 0.
+  const stop = (code, message) => {
+    if (background) console.log(`NOT OPENED: ${message}`);
+    else console.error(message);
+    process.exit(background ? 0 : code);
+  };
   const data = argValue('--data');
+  if (!data) stop(2, 'usage: node login.mjs --data <dir> [--proxy-suffix <library proxy>] [--login-url <sign-in page>]');
   const suffix = proxySuffix(argValue('--proxy-suffix') || pluginOptions().proxy_suffix);
-  if (!data || !suffix) {
-    console.error('usage: node login.mjs --data <dir> [--proxy-suffix <library proxy>] [--login-url <sign-in page>]\n'
-      + (!data ? '(/lit-fetch-ladder:login prints this command)'
-        : 'No library proxy is set, so there is nothing to sign in to. On a campus network or VPN no login is\n'
-        + 'needed. Otherwise set "Library proxy" in /config under lit-fetch-ladder, or pass --proxy-suffix.'));
-    process.exit(2);
+  if (!suffix) {
+    stop(2, 'no library proxy is set, so there is nothing to sign in to. On a campus network or VPN no login\n'
+      + 'is needed. Otherwise set "Library proxy" in /config under lit-fetch-ladder, or pass --proxy-suffix.');
   }
   if (!hasDisplay()) {
-    console.error('No display: the sign-in window cannot open here. Either forward a display into this\n'
-      + 'environment (see the README section "Signing in from a container"), or run this same\n'
-      + 'command on a machine with a browser using a temporary --data directory and copy the\n'
-      + `resulting secret/library-state.json to ${path.join(data, ...SESSION_FILE)}.`);
-    process.exit(3);
+    stop(3, 'no display, so the sign-in window cannot open here. Forward a display into this environment\n'
+      + '(README, "Signing in from a container"), or run this command on a machine with a browser, using a\n'
+      + `temporary --data directory, and copy the resulting secret/library-state.json to ${path.join(data, ...SESSION_FILE)}.`);
   }
+  const loginUrl = (argValue('--login-url') || '').replace(/%u|\{url\}/gi, '') || await signInUrl(suffix);
+  if (background) {
+    startInBackground(data, suffix, loginUrl);
+    return;
+  }
+
   const secretDir = path.join(data, 'secret');
   fs.mkdirSync(secretDir, { recursive: true, mode: 0o700 });
   const raw = path.join(secretDir, 'login-raw.json');
   const out = path.join(data, ...SESSION_FILE);
+  const pidFile = process.env.LFL_LOGIN_PID_FILE;
+  if (pidFile) process.on('exit', () => fs.rmSync(pidFile, { force: true }));
 
-  const loginUrl = (argValue('--login-url') || '').replace(/%u|\{url\}/gi, '') || await signInUrl(suffix);
   console.log(`\nA browser window is opening${loginUrl ? ` at your library's sign-in page (${loginUrl})` : ''}.`);
   console.log('Sign in, open one paper through your library to check access, then CLOSE THE WINDOW.');
   console.log("If the window does not show your library's sign-in, go to your library's website in it, sign in\n"
@@ -86,8 +111,32 @@ async function main() {
     console.log(`Saved: ${out} (readable only by you).`);
     console.log(`Kept ${scoped.cookies.length} proxy cookie(s); dropped cookies for ${dropped.length} other site(s)`
       + `${dropped.length ? `: ${dropped.join(', ')}` : ''}.`);
-    console.log('Library sessions usually expire within hours; run this again when fetches bounce to the sign-in page.');
+    console.log('Library sessions usually expire within hours; sign in again when fetches land on the sign-in page.');
   });
+}
+
+// The slash command cannot wait for a sign-in, so it starts this script again, detached, to open
+// the window and save the login when the window closes. Its output goes to <data>/login.log.
+function startInBackground(data, suffix, loginUrl) {
+  const pidFile = path.join(data, 'login.pid');
+  const running = fs.existsSync(pidFile) ? Number.parseInt(fs.readFileSync(pidFile, 'utf8'), 10) : 0;
+  if (running && isAlive(running)) {
+    console.log('ALREADY OPEN: a sign-in window is already open. Finish signing in there and close it.');
+    return;
+  }
+  fs.mkdirSync(data, { recursive: true });
+  const log = fs.openSync(path.join(data, 'login.log'), 'w');
+  const args = [fileURLToPath(import.meta.url), '--data', data, '--proxy-suffix', suffix];
+  if (loginUrl) args.push('--login-url', loginUrl);
+  const child = spawn(process.execPath, args, {
+    detached: true, stdio: ['ignore', log, log], env: { ...process.env, LFL_LOGIN_PID_FILE: pidFile },
+  });
+  fs.writeFileSync(pidFile, String(child.pid));
+  child.unref();
+  fs.closeSync(log);
+  console.log(`OPENING: a browser window is opening${loginUrl ? ` at your library's sign-in page (${loginUrl})` : ''}.`);
+  console.log('Sign in, open one paper through your library to check access, then close the window.');
+  console.log(`The login is saved when the window closes (log: ${path.join(data, 'login.log')}).`);
 }
 
 if (process.argv[1] && process.argv[1].endsWith('login.mjs')) main();

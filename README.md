@@ -26,6 +26,14 @@ guard around it.
 /plugin install lit-fetch-ladder@fetch-ladder
 ```
 
+**Install it for one folder.** Start Claude Code in the folder you use for literature surveys, then
+run the two commands. When Claude Code asks where to install, choose **Install for you, in this repo
+only** (in VS Code: **Install locally**). An enabled plugin loads in every session of the folders it is
+installed for: its guard runs before every file and shell command, and its two browser servers start.
+Installed for one folder, it stays out of your other work, and you never have to switch it on and off.
+From a shell, in that folder, the same install is
+`claude plugin install lit-fetch-ladder@fetch-ladder --scope local`.
+
 Claude Code then asks for two settings, which you can change later in `/config`:
 
 | Setting | What to enter |
@@ -49,10 +57,13 @@ Windows should work but are untested; reports are welcome.
 /lit-fetch-ladder:login
 ```
 
-The skill shows you a command to run **in your own terminal**. The agent never runs it, and the plugin
-blocks it from trying. A browser window opens at your library's sign-in page, which the plugin works out
-from your proxy setting; sign in as you normally do, open one paper to check access, and close the
-window. If the window shows an error instead, go to your library's website in that window, sign in,
+A browser window opens at your library's sign-in page, which the plugin works out from your proxy
+setting. Sign in as you normally do, open one paper to check access, and close the window; the login is
+saved when the window closes, and `/lit-fetch-ladder:doctor` shows its age. Only you can run this
+command: the agent is not allowed to invoke it. If the window cannot open (no display, or a policy that
+turns off commands in skills), the command shows a line to run in your own terminal instead, which opens
+the same window and waits. Only ever sign in to a window you opened yourself. If the window shows an
+error instead of the sign-in page, go to your library's website in that window, sign in,
 open a paper through it and close the window. A library whose sign-in page lives elsewhere can be given
 it with `--login-url <address>`. Only the proxy's own cookies are saved. The
 sign-in provider's cookies (single sign-on, second factor) are dropped, so the saved file cannot sign
@@ -130,7 +141,7 @@ instructions. A plugin cannot ship permission rules, so the rule is enforced by 
 | reuse a site approved in an earlier batch | allowed only in batches that include the site it was approved from, and listed in their approval prompt | enforced; forget with `/lit-fetch-ladder:sites` |
 | fetch a proxied address with `curl` or WebFetch, outside the counted browser | denied | enforced for proxied addresses; a tokenised link on a site that is not proxied is a rule in the skill |
 | loop, by navigating or by clicking through pages | per-paper budget, 20 page loads per burst, 60 per 24 hours; a click or key press in the logged-in browser counts when it opens a page or a tab | enforced |
-| make you run the sign-in, or run it itself | the agent is blocked from running it | enforced |
+| make you run the sign-in, or run it itself | the sign-in starts from your `/lit-fetch-ladder:login`, which the agent cannot invoke; its shell commands that name the sign-in script are refused | enforced for the slash command; the shell check is a pattern match |
 | open more papers from the same publisher within the budget | bounded by the budget, not prevented | partly |
 
 Read-only browser calls (navigate, snapshot, screenshot, wait) and page loads inside an approved batch
