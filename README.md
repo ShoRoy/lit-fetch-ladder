@@ -1,7 +1,9 @@
 # lit-fetch-ladder
 
 Fetch papers for a literature survey with a coding agent, open access first, and reach the rest
-through your own library login, with the prompt-injection safeguards enforced as code.
+through your own library login, with the prompt-injection safeguards enforced as code. The article
+behind it, with the runs and the threat model:
+[The last rung of an agent-orchestrated literature survey](https://levelup.gitconnected.com/the-last-rung-of-an-agent-run-literature-survey-institutional-login-safeguards-and-plugin-3839ee41aaf9).
 
 It climbs a ladder and stops at the lowest rung that works:
 
