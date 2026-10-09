@@ -48,7 +48,7 @@ npx -y -p @playwright/mcp@0.0.78 playwright install chromium
 /lit-fetch-ladder:doctor
 ```
 
-Requirements: Claude Code 2.1.271 or later, Node 18+, Python 3.9+. Tested on Linux. macOS and
+Requirements: Claude Code 2.1.271 or later (built and tested on 2.1.289), Node 18+, Python 3.9+. Tested on Linux. macOS and
 Windows should work but are untested; reports are welcome.
 
 ## Sign in to your library (rung 3 only)
@@ -100,8 +100,11 @@ the window will open.
 ```
 
 The agent lists the candidates, tells you how many look open access and how many need the library,
-and runs the batch. Open-access PDFs land in `lit-fetch-runs/<batch>/pdfs/` in your project. On the
-first library page load Claude Code asks you to approve the batch. The prompt lists every site the
+and runs the batch. Open-access PDFs land in `lit-fetch-runs/<batch>/pdfs/` in your project. Papers the
+library browser fetches land beside them, in `pdfs/` for a PDF and `fulltext/` for saved page text. Saved
+text is checked for a references section: a page saved before the publisher loaded the article body is
+flagged in the manifest rather than counted as the paper. On the first library page load Claude Code asks
+you to approve the batch. The prompt lists every site the
 logged-in browser will open, with the number of papers on each, and the page budget:
 
 ```
@@ -126,8 +129,8 @@ batch costs one prompt.
 
 ## What the safeguards enforce
 
-Every page the browser opens is untrusted. The rule is that fetched text is data, never
-instructions. A plugin cannot ship permission rules, so the rule is enforced by a hook
+Any page the browser opens could carry instructions planted for an agent. The rule is that fetched
+text is data, never instructions. A plugin cannot ship permission rules, so the rule is enforced by a hook
 (`guard/guard.mjs`) that Claude Code runs before and after every relevant tool call.
 
 | A fetched page tries to... | What happens | Enforced or a rule |
@@ -222,8 +225,10 @@ about them is disguised. Nothing is sent to the author of this plugin.
 
 ## Uninstall and data
 
-`/plugin uninstall lit-fetch-ladder` removes the plugin and its data directory, including the saved
-login, unless you pass `--keep-data`. Fetched papers stay in your project's `lit-fetch-runs/`.
+Uninstalling, from the Installed tab of `/plugin` or with `claude plugin uninstall
+lit-fetch-ladder@fetch-ladder` in a shell, removes the plugin and its data directory, including the saved
+login; the shell form takes `--keep-data` to keep them. Fetched papers stay in your project's
+`lit-fetch-runs/`.
 
 ## Updates
 
@@ -234,7 +239,7 @@ each release (see `CHANGELOG.md`).
 ## Development
 
 ```
-node --test tests/ tests/redteam/        # guard, login scoping, red-team replay
+node --test tests/ tests/redteam/        # guard, sign-in, launcher, red-team replay
 python3 -m unittest discover -s tests    # rungs 0-1 and the manifest, offline
 claude plugin validate --strict .
 ```
