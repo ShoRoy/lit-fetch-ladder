@@ -540,3 +540,40 @@ test('the sites skill lists and forgets companions, and a forgotten one asks aga
   writeManifest(sb.manifest, ['p'], 'b2');
   assert.doesNotMatch(run(sb, libNav(libUrl('www-examplepub-com', '/doi/10.1/p'))).reason, /Also allowed/);
 });
+
+test('zotero-cli commands that trash, merge, edit or switch the library ask; filing a batch does not', () => {
+  const sb = sandbox();
+  for (const command of ['zotero-cli delete item ABC12345', 'zotero-cli --json duplicates merge --keeper A --duplicates B',
+    'zotero-cli batch --tag x --remove-tags x', 'zotero-cli edit ABC12345 --title t',
+    'zotero-cli library switch --library-id 1 --library-type group', 'zotero-cli notes delete N1']) {
+    assert.equal(run(sb, pre('Bash', { command })).decision, 'ask', command);
+  }
+  for (const command of ['zotero-cli --json add doi 10.1/x -c "lit-fetch-ladder/b1" --create-collections --if-exists file --attach-mode none',
+    'zotero-cli --json attach ABC12345 --file /runs/b1/fulltext/p.yml --filename 10.1_x.yml',
+    'zotero-cli --json notes create --item-key ABC12345 --text -', 'zotero-cli coverage --collection C1',
+    'python3 cli/lfl.py zotero --batch b1', 'python3 cli/lfl.py zotero --batch b1 --dry-run', 'zotero-mcp setup']) {
+    assert.equal(run(sb, pre('Bash', { command })).decision, 'none', command);
+  }
+});
+
+test("the plugin's own undo, lfl zotero --trash, asks once for its whole list", () => {
+  const sb = sandbox();
+  for (const command of ['python3 cli/lfl.py zotero --trash ABC12345 DEF67890', 'lfl zotero --trash ABC12345',
+    'python3 "/plugins/lit-fetch-ladder/cli/lfl.py" zotero --zotero-cli ~/.local/bin/zotero-cli --trash ABC12345 --dry-run']) {
+    const r = run(sb, pre('Bash', { command }));
+    assert.equal(r.decision, 'ask', command);
+    assert.match(r.reason, /whole list/);
+  }
+  assert.equal(run(sb, pre('Bash', { command: 'lfl zotero --batch b1 --collection trash-talk' })).decision, 'none');
+});
+
+test('Zotero MCP tools that trash, merge, edit or switch the library ask; adding and attaching do not', () => {
+  const sb = sandbox();
+  for (const tool of ['delete_item', 'delete_collection', 'delete_annotation', 'merge_duplicates', 'batch_update', 'switch_library']) {
+    assert.equal(run(sb, pre(`mcp__zotero__zotero_${tool}`, {})).decision, 'ask', tool);
+  }
+  assert.equal(run(sb, pre('mcp__zotero__zotero_manage_note', { action: 'delete', item_key: 'N' })).decision, 'ask');
+  assert.equal(run(sb, pre('mcp__zotero__zotero_manage_note', { action: 'create', item_key: 'N' })).decision, 'none');
+  assert.equal(run(sb, pre('mcp__zotero__zotero_add_item', { source: '10.1/x', if_exists: 'file' })).decision, 'none');
+  assert.equal(run(sb, pre('mcp__zotero__zotero_attach_file', { item_key: 'A', file_path: '/x.pdf' })).decision, 'none');
+});

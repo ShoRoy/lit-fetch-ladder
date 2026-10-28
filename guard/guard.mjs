@@ -16,6 +16,9 @@
 //      failure errs toward fewer loads, never more.
 //   5. The saved login and the guard's own state are off-limits to the agent's
 //      file and shell tools.
+//   6. zotero-cli commands and Zotero MCP tools that trash, merge, bulk-edit or
+//      switch the user's library ask; filing a batch never needs them. The plugin's
+//      own undo, `lfl zotero --trash KEY...`, asks once for its whole list.
 // A crash while judging a browser call denies the call (fail closed).
 
 import fs from 'node:fs';
@@ -427,6 +430,20 @@ function judgeSite(cfg, st, url, approval, batch, key, now) {
 const PATH_KEYS = ['file_path', 'notebook_path', 'path'];
 const SHELL_TOOLS = new Set(['Bash', 'PowerShell', 'Monitor']);
 const FILE_TOOLS = new Set(['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Grep', 'Glob']);
+// zotero-cli (it ships with Zotero MCP) and the Zotero MCP tools can trash, merge, bulk-edit
+// and switch the user's library. Filing a batch only adds, attaches and annotates, so these ask.
+const ZOTERO_CLI_RE = /\bzotero-cli\b[^|;&\n]*\b(delete|merge|batch|edit|switch)\b/;
+// The plugin's own undo: `lfl zotero --trash KEY...` moves a listed set in one command, so one ask covers the list.
+const LFL_TRASH_RE = /\blfl(?:\.py)?\b[^|;&\n]*\bzotero\b[^|;&\n]*--trash\b/;
+const ZOTERO_MCP_RE = /^mcp__.+__zotero_(delete_item|delete_collection|delete_annotation|merge_duplicates|batch_update|switch_library|manage_note)$/;
+const ZOTERO_ASK = 'can trash, merge, edit or switch your Zotero library; filing a fetched batch never needs it. Confirm it is part of what you asked for.';
+
+function judgeZotero(tool, input) {
+  const m = ZOTERO_MCP_RE.exec(tool);
+  if (!m) return null;
+  if (m[1] === 'manage_note' && input.action !== 'delete') return null;
+  return out('ask', `"${tool}" ${ZOTERO_ASK}`);
+}
 
 function norm(p) {
   let r = path.resolve(p);
@@ -462,6 +479,8 @@ function judgeFiles(cfg, tool, input) {
     if (/scripts[\\/]+login\.mjs/.test(c)) {
       return out('deny', 'the library sign-in is run by the user in their own terminal, never by the agent (see /lit-fetch-ladder:login).');
     }
+    if (ZOTERO_CLI_RE.test(c)) return out('ask', `this zotero-cli command ${ZOTERO_ASK}`);
+    if (LFL_TRASH_RE.test(c)) return out('ask', 'this command moves the listed Zotero items to the trash, one confirmation for the whole list; filing a batch never needs it. Confirm the list is what you asked for.');
   }
   if (tool === 'WebFetch' && typeof input.url === 'string' && cfg.mode === 'ezproxy-host') {
     const h = hostOf(input.url);
@@ -485,7 +504,7 @@ function preToolUse(cfg, ev, now) {
     }
   }
   try {
-    return judgeFiles(cfg, ev.tool_name || '', input);
+    return judgeZotero(ev.tool_name || '', input) || judgeFiles(cfg, ev.tool_name || '', input);
   } catch {
     return null;
   }

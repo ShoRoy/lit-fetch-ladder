@@ -1,7 +1,7 @@
 {
   "name": "lit-fetch-ladder",
   "displayName": "Lit Fetch Ladder",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Fetch papers for a literature survey, open access first: discovery, open-access download, a headless browser, then the same browser carrying your library login, with prompt-injection safeguards enforced as hooks.",
   "author": {
     "name": "Shobhan Roy"

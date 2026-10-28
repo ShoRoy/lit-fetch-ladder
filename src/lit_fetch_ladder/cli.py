@@ -1,10 +1,10 @@
-"""Command-line front end: `lfl discover|resolve|proxify|fetch|mark|show`."""
+"""Command-line front end: `lfl discover|resolve|proxify|fetch|mark|show|zotero`."""
 import argparse
 import json
 import os
 import sys
 
-from . import discover, fetch, net, proxify, resolve, settings
+from . import discover, fetch, net, proxify, resolve, settings, zotero
 
 
 def _env(name, default=None):
@@ -60,11 +60,35 @@ def main(argv=None):
     s.add_argument("--batch", required=True)
     s.add_argument("--base", default=_env("LFL_BASE", "lit-fetch-runs"))
 
+    z = sub.add_parser("zotero", help="file a finished batch into Zotero through zotero-cli (it ships with Zotero MCP), "
+                       "or move listed items to Zotero's trash")
+    z.add_argument("--batch", help="the batch to file")
+    z.add_argument("--trash", nargs="+", metavar="KEY",
+                   help="instead of filing: move these items to Zotero's trash in one command (the guard asks once for the list)")
+    z.add_argument("--base", default=_env("LFL_BASE", "lit-fetch-runs"))
+    z.add_argument("--collection", help="a collection key, name or parent/child path (default: lit-fetch-ladder/<batch>)")
+    z.add_argument("--zotero-cli", default=_env("LFL_ZOTERO_CLI", "zotero-cli"), help="the zotero-cli command (or LFL_ZOTERO_CLI)")
+    z.add_argument("--refresh", action="store_true", help="file rows that were filed before, again")
+    z.add_argument("--dry-run", action="store_true", help="print the zotero-cli commands and run nothing")
+
     a = ap.parse_args(argv)
 
     if a.cmd == "show":
         print(json.dumps(fetch.load(fetch.paths(a.base, a.batch)[1], a.batch), indent=2))
         return 0
+
+    if a.cmd == "zotero":
+        if a.trash:
+            lines, n, ok = zotero.trash(a.trash, a.zotero_cli, a.dry_run)
+            head = "dry run, nothing trashed" if a.dry_run else "moved %d item(s) to Zotero's trash" % n
+            print("zotero: %s\n%s" % (head, "\n".join(lines)))
+            return 0 if ok else 2
+        if not a.batch:
+            ap.error("zotero needs --batch <name> to file, or --trash KEY... to undo")
+        lines, filed, ok = zotero.file_batch(a.batch, a.base, a.zotero_cli, a.collection, a.refresh, a.dry_run)
+        head = "dry run, nothing filed" if a.dry_run else "filed %d row(s) into Zotero" % filed
+        print("batch '%s': %s\n%s" % (a.batch, head, "\n".join(lines)))
+        return 0 if ok else 2
 
     if a.cmd == "mark":
         row = fetch.mark(a.batch, a.base, a.doi, a.state, a.path, a.note,

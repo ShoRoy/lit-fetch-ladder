@@ -2,7 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "mcp__plugin_lit-fetch-ladder_.*|Read|Edit|Write|MultiEdit|NotebookEdit|Grep|Glob|Bash|PowerShell|Monitor|WebFetch",
+        "matcher": "mcp__plugin_lit-fetch-ladder_.*|Read|Edit|Write|MultiEdit|NotebookEdit|Grep|Glob|Bash|PowerShell|Monitor|WebFetch|mcp__.*__zotero_(delete_item|delete_collection|delete_annotation|merge_duplicates|batch_update|switch_library|manage_note)",
         "hooks": [
           {
             "type": "command",

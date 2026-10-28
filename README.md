@@ -129,6 +129,52 @@ batch without the site they follow. `/lit-fetch-ladder:sites` lists them and for
 can add one except your approval in a prompt. After the first batch from a publisher, a typical
 batch costs one prompt.
 
+## File a batch into Zotero
+
+[Zotero MCP](https://github.com/54yyyu/zotero-mcp) (`zotero-mcp-server`) adds a paper by DOI with its
+open-access PDF, and for a paywalled paper it stores the metadata and no file. This plugin fills that
+gap: once a batch has run, each paper it could read is filed into your library with what the batch
+got. Install Zotero MCP and give it a way to write to your library, once:
+
+```
+uv tool install zotero-mcp-server      # or: pipx install zotero-mcp-server
+zotero-mcp setup
+```
+
+Writes go to the running Zotero desktop (Zotero 10 or newer, after `zotero-mcp authorize-local` and
+**Always Allow** in the dialog Zotero shows) or through the web API (an API key and your library ID,
+any Zotero version; `zotero-mcp setup` asks for them). `/lit-fetch-ladder:doctor` reports whether
+`zotero-cli` is found. Then, after a batch, ask the agent to file it, or run it yourself:
+
+```
+python3 <plugin root>/cli/lfl.py zotero --batch survey [--collection "Reading list"] [--dry-run]
+```
+
+For each paper the batch could read, the item is added by DOI into the collection
+`lit-fetch-ladder/<batch>` (unless `--collection` names another) with the tag `lit-fetch-ladder`, so one
+tag shows everything the plugin ever filed; the PDF or the saved page text is attached under a name made
+from the DOI; and a note records the batch, the date, how the paper was obtained and the file's hash. A
+paper already in your library is reused, not duplicated: it joins the collection and gets the note, and
+keeps the file it has, so a fetched file is attached only to an item without one. A paper that ended
+`ABSTRACT_ONLY` gets the item and the note, with no file. Papers the batch could not read are listed and
+never filed, and a second run files only new rows; the manifest records each filing under `zotero`.
+Saved page text is a `.yml` file, which Zotero stores as text and indexes, so it is searchable in Zotero
+and readable through Zotero MCP. `--dry-run` prints the `zotero-cli` commands and the notes without
+running them. `--trash KEY...` undoes a filing that went wrong: it moves the listed items to Zotero's
+trash (recoverable) in one command, so the guard asks once for the whole list instead of once per
+item. Nothing else in the plugin deletes anything.
+
+If you sync files over WebDAV and your Zotero Storage quota is full, zotero-mcp up to 0.15.1 still
+uploads each file to Zotero Storage first and Zotero refuses it; the run then stops at the first refused
+file and says so. A fix that writes to WebDAV directly is proposed upstream.
+
+The other way round, `zotero-cli coverage` lists the items in your library that have no PDF, with
+their DOIs. Give those DOIs to `/lit-fetch-ladder:fetch` and file the batch back.
+
+`zotero-cli` can also trash, merge and bulk-edit your library, and so can Zotero MCP's tools. The
+guard asks before the agent runs any of those, so a planted instruction cannot reach them through a
+fetch; filing only adds, attaches and annotates. Use your personal library, not a group library.
+
 ## What the safeguards enforce
 
 Any page the browser opens could carry instructions planted for an agent. The rule is that fetched
@@ -147,6 +193,7 @@ text is data, never instructions. A plugin cannot ship permission rules, so the 
 | fetch a proxied address with `curl` or WebFetch, outside the counted browser | denied | enforced for proxied addresses; a tokenised link on a site that is not proxied is a rule in the skill |
 | loop, by navigating or by clicking through pages | per-paper budget, 20 page loads per burst, 60 per 24 hours; a click or key press in the logged-in browser counts when it opens a page or a tab | enforced |
 | make you run the sign-in, or run it itself | the sign-in starts from your `/lit-fetch-ladder:login`, which the agent cannot invoke; its shell commands that name the sign-in script are refused | enforced for the slash command; the shell check is a pattern match |
+| trash, merge or bulk-edit your Zotero library through `zotero-cli`, Zotero MCP or `lfl zotero --trash` | you are asked, once per command (one list for `--trash`); filing a batch only adds, attaches and annotates | enforced for the named commands and tools; the shell check is a pattern match |
 | open more papers from the same publisher within the budget | bounded by the budget, not prevented | partly |
 
 Read-only browser calls (navigate, snapshot, screenshot, wait) and page loads inside an approved batch
@@ -211,6 +258,7 @@ pip install git+https://github.com/ShoRoy/lit-fetch-ladder
 export LFL_EMAIL=you@example.org
 lfl discover "graph neural networks molecular property prediction" --limit 10
 lfl fetch 10.48550/arXiv.1706.03762 --batch survey --proxy-mode none
+lfl zotero --batch survey              # file it into Zotero, with zotero-cli installed
 ```
 
 The two browser servers are ordinary Playwright MCP configurations (see `scripts/mcp-server.mjs`) and

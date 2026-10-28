@@ -28,6 +28,9 @@ const py = spawnSync(process.platform === 'win32' ? 'python' : 'python3', ['-c',
 check(py.stdout?.trim() === 'True', 'Python 3.9+ for the fetch tools', 'install Python 3.9 or later');
 const npx = spawnSync(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['--version'], { encoding: 'utf8', shell: process.platform === 'win32' });
 check(npx.status === 0, 'npx available', 'npx ships with Node; check your PATH');
+const zc = spawnSync(process.platform === 'win32' ? 'zotero-cli.exe' : 'zotero-cli', ['--help'], { encoding: 'utf8', shell: process.platform === 'win32' });
+if (zc.status === 0) check(true, 'zotero-cli found: fetched batches can be filed into Zotero (lfl zotero)');
+else note('zotero-cli not found (optional): install zotero-mcp-server to file batches into Zotero; see the README');
 
 const cacheRoots = [process.env.PLAYWRIGHT_BROWSERS_PATH,
   path.join(os.homedir(), '.cache', 'ms-playwright'),

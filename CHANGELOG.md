@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.0
+
+- `lfl zotero --batch <name>` files a finished batch into Zotero through `zotero-cli` (it ships with
+  Zotero MCP): each paper the batch could read is added by DOI (an item that already carries the DOI
+  is reused), its PDF or saved page text is attached under a DOI-based name, and a note records the
+  batch, the date, how the paper was obtained and the file's hash; `ABSTRACT_ONLY` rows get the item
+  and the note. Rows the batch could not read are listed, not filed; the manifest records each filing,
+  so a re-run files only new rows. `--dry-run` prints the commands. The fetch skill offers it after a
+  batch when `zotero-cli` is found, and the doctor reports whether it is.
+- Filing protocol: everything filed carries the tag `lit-fetch-ladder` and lands in
+  `lit-fetch-ladder/<batch>`; a paper already in the library joins the collection and gets the note but
+  keeps its own file, so nothing of the user's is duplicated or replaced. A full Zotero Storage quota
+  (zotero-mcp up to 0.15.1 uploads there first even with WebDAV) stops the run at the first refused
+  file, with Zotero's message.
+- Guard: `zotero-cli` commands and Zotero MCP tools that trash, merge, bulk-edit or switch the library
+  ask before they run; filing never needs them. `lfl zotero --trash KEY...` moves a listed set of items to
+  Zotero's trash in one guarded command, so undoing a filing is one confirmation rather than one per item.
+- Saved page text is `.yml`, which `zotero-cli` attaches and Zotero indexes (zotero-mcp 0.15 or
+  later). Text in a type it does not take stays on disk, and the note says where.
+
 ## 0.1.0
 
 First release.
