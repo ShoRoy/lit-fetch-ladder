@@ -50,11 +50,14 @@ on the command line.
 6. **Never guess a PDF URL.** An unverified guess becomes a fabricated citation.
 7. **Personal research use.** No bulk harvesting, no looping over long DOI lists, nothing re-hosted.
 8. **Zotero: add, attach and annotate only.** Never run `zotero-cli delete`, `duplicates merge`,
-   `batch`, `edit` or `library switch`, or Zotero MCP's delete, merge, batch-update or switch-library
-   tools, as part of a fetch; the guard asks before them. The user's personal library only. To undo a
-   filing that went wrong, run `python3 "${CLAUDE_PLUGIN_ROOT}/cli/lfl.py" zotero --trash <KEY...>` once
-   with the user's list of item keys: the guard asks once for the whole list, and Zotero's trash is
-   recoverable.
+   `batch`, `edit`, `tags --remove`, `library switch`, or an `update`, `delete` or `manage` under
+   `notes`, `annotations` or `collections`, nor Zotero MCP's delete, merge, update, set, batch-update,
+   switch-library or authorize-local-writes tools, as part of a fetch; the guard asks before them. Never
+   set `ZOTERO_*` variables on a command line, never run `zotero-mcp setup` or `authorize-local`, and
+   never run Python against the plugin's or zotero-mcp's modules: each asks too. The user's personal
+   library only. To undo a filing that went wrong, run
+   `python3 "${CLAUDE_PLUGIN_ROOT}/cli/lfl.py" zotero --trash <KEY...>` once with the user's list of
+   item keys: the guard asks once for the whole list, and Zotero's trash is recoverable.
 
 ## Procedure
 
@@ -77,6 +80,8 @@ on the command line.
    `auth_url`. The batch always finishes; one failure never blocks the rest.
 3. **Rung 2, pages a script cannot read.** For an `OA_LANDING` row whose landing page refuses a plain
    client, open it with the `browse` browser and save the article text or PDF. No login is involved.
+   Record what it saved: `lfl mark <DOI> --batch <name> --state OA_FETCHED --path <file>` (the file is
+   required; the manifest keeps the landing address it came from).
 4. **Rung 3, the library browser**, for each staged row (`NEEDS_AUTH`, or `OA_LANDING` with an
    `auth_url`):
    - `browser_navigate` to the row's `auth_url`. The first load asks the user to approve the batch.
@@ -84,7 +89,10 @@ on the command line.
      `/lit-fetch-ladder:login`. Do not run it yourself; the plugin blocks it.
    - **Article page:** get the PDF if the page offers one. A file download lands in
      `${CLAUDE_PLUGIN_DATA}/downloads/library/`. If the publisher shows only an in-page viewer, save the
-     article's full text from the page snapshot instead. Many publishers load the article body a few
+     article's full text from the page snapshot instead. The same goes for a PDF address the browser
+     renders rather than downloads (an empty snapshot, no download event): save the page text and note
+     that the PDF is a manual export, unless the Chromium policy named in the README is set, which makes
+     such addresses download. Many publishers load the article body a few
      seconds after the page, so first `browser_wait_for` the reference list's heading (for example the
      text "References"); waiting loads no page and costs nothing. Then take the snapshot with a short file
      name, which saves it in `${CLAUDE_PLUGIN_DATA}/downloads/library/`, and check that it holds the
@@ -105,8 +113,8 @@ on the command line.
 5. **Report.** From `lfl show --batch <name>`: a table (title, year, how it was obtained, file, DOI)
    and the list of papers the batch could not get, each with its state. Point out any paper that came
    from a bare title so the user can check it is the right one, and any row carrying a `warning`.
-6. **File into Zotero**, when `zotero-cli` is on PATH (`command -v zotero-cli`; it ships with Zotero
-   MCP). Offer it after the report, or run it when asked to file a batch:
+6. **File into Zotero**, when `zotero-cli` is on PATH (it ships with Zotero MCP; the doctor reports
+   whether it is found). Offer it after the report, or run it when asked to file a batch:
 
    ```
    python3 "${CLAUDE_PLUGIN_ROOT}/cli/lfl.py" zotero --batch <name> [--collection <key, name or parent/child>]
@@ -115,8 +123,10 @@ on the command line.
    It adds each paper the batch could read by DOI into the batch's collection with the tag
    `lit-fetch-ladder` (a paper already in the library is reused: it joins the collection, gets the
    note and keeps its own file), attaches the PDF or the saved page text to an item without a file,
-   and leaves a note saying how the paper was obtained; an `ABSTRACT_ONLY` row gets the item and the
-   note. Rows the batch could not read are listed, not filed, and a second run files only new rows.
+   and leaves a note saying how the paper was obtained. A row without full text (`ABSTRACT_ONLY`) is
+   never filed: it serves this round's review and nothing more. Rows the batch could not read are
+   listed, not filed, and a second run files only new rows. After a `--trash`, the manifest still
+   records the trashed filing: file those papers again with `--refresh`.
    Report its output. If it answers that zotero-cli has no way to write to the library, or that the
    Zotero Storage quota is full, relay its message, which names the fix (`zotero-mcp authorize-local`
    on Zotero 10 or newer, web API credentials, freed quota), and stop: never run the authorisation

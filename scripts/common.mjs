@@ -5,6 +5,7 @@ import dns from 'node:dns/promises';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const PLAYWRIGHT_MCP = '@playwright/mcp@0.0.78';
 // The Chrome that PLAYWRIGHT_MCP bundles (151.0.7922 for 0.0.78). Change it with the pin.
@@ -26,6 +27,22 @@ export function underSuffix(host, suffix) {
 export function argValue(name, fallback = '') {
   const i = process.argv.indexOf(name);
   return i > 0 && i + 1 < process.argv.length ? process.argv[i + 1] : fallback;
+}
+
+// The plugin's data directory for a script run by hand: CLAUDE_PLUGIN_DATA when Claude Code set it,
+// else the directory Claude Code keeps for this plugin, named <plugin>-<marketplace> (the marketplace
+// name comes from the plugin's own manifest), else the one such directory that exists; '' otherwise.
+export function defaultDataDir(env = process.env, home = os.homedir(), pluginRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')) {
+  if (env.CLAUDE_PLUGIN_DATA) return env.CLAUDE_PLUGIN_DATA;
+  const root = path.join(home, '.claude', 'plugins', 'data');
+  try {
+    const market = JSON.parse(fs.readFileSync(path.join(pluginRoot, '.claude-plugin', 'marketplace.json'), 'utf8')).name;
+    const own = path.join(root, `lit-fetch-ladder-${market}`);
+    if (market && fs.existsSync(own)) return own;
+  } catch { /* no manifest to read: fall through */ }
+  let dirs = [];
+  try { dirs = fs.readdirSync(root).filter((d) => d.startsWith('lit-fetch-ladder-')); } catch { /* no plugin data yet */ }
+  return dirs.length === 1 ? path.join(root, dirs[0]) : '';
 }
 
 // The browsers identify as the desktop Chrome they are, without the "HeadlessChrome" marker

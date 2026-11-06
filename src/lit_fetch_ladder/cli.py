@@ -12,7 +12,9 @@ def _env(name, default=None):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="lfl", description="Fetch papers for a literature survey, open access first.")
+    # allow_abbrev=False: an abbreviated flag such as --tr would reach --trash past the guard's pattern.
+    ap = argparse.ArgumentParser(prog="lfl", description="Fetch papers for a literature survey, open access first.",
+                                 allow_abbrev=False)
     ap.add_argument("--email", help="contact address for OpenAlex/Unpaywall (or LFL_EMAIL)")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
@@ -60,11 +62,14 @@ def main(argv=None):
     s.add_argument("--batch", required=True)
     s.add_argument("--base", default=_env("LFL_BASE", "lit-fetch-runs"))
 
+    # allow_abbrev=False here as well: a subparser does not inherit it, and an abbreviated --tr would
+    # reach --trash past the guard's pattern.
     z = sub.add_parser("zotero", help="file a finished batch into Zotero through zotero-cli (it ships with Zotero MCP), "
-                       "or move listed items to Zotero's trash")
-    z.add_argument("--batch", help="the batch to file")
-    z.add_argument("--trash", nargs="+", metavar="KEY",
-                   help="instead of filing: move these items to Zotero's trash in one command (the guard asks once for the list)")
+                       "or move listed items to Zotero's trash", allow_abbrev=False)
+    what = z.add_mutually_exclusive_group(required=True)
+    what.add_argument("--batch", help="the batch to file")
+    what.add_argument("--trash", nargs="+", metavar="KEY",
+                      help="instead of filing: move these items to Zotero's trash in one command (the guard asks once for the list)")
     z.add_argument("--base", default=_env("LFL_BASE", "lit-fetch-runs"))
     z.add_argument("--collection", help="a collection key, name or parent/child path (default: lit-fetch-ladder/<batch>)")
     z.add_argument("--zotero-cli", default=_env("LFL_ZOTERO_CLI", "zotero-cli"), help="the zotero-cli command (or LFL_ZOTERO_CLI)")
@@ -83,8 +88,6 @@ def main(argv=None):
             head = "dry run, nothing trashed" if a.dry_run else "moved %d item(s) to Zotero's trash" % n
             print("zotero: %s\n%s" % (head, "\n".join(lines)))
             return 0 if ok else 2
-        if not a.batch:
-            ap.error("zotero needs --batch <name> to file, or --trash KEY... to undo")
         lines, filed, ok = zotero.file_batch(a.batch, a.base, a.zotero_cli, a.collection, a.refresh, a.dry_run)
         head = "dry run, nothing filed" if a.dry_run else "filed %d row(s) into Zotero" % filed
         print("batch '%s': %s\n%s" % (a.batch, head, "\n".join(lines)))

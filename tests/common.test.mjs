@@ -5,8 +5,23 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CHROME_MAJOR, desktopUserAgent, pluginOptions, proxySuffix, signInUrl } from '../scripts/common.mjs';
+import { CHROME_MAJOR, defaultDataDir, desktopUserAgent, pluginOptions, proxySuffix, signInUrl } from '../scripts/common.mjs';
 import { proxySuffix as guardProxySuffix } from '../guard/guard.mjs';
+
+test('a script run by hand finds the plugin data directory: the environment, else the one Claude Code keeps', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lfl-home-'));
+  const noManifest = path.join(home, 'elsewhere');  // a plugin root without a marketplace manifest
+  assert.equal(defaultDataDir({}, home), '');  // nothing installed yet
+  const root = path.join(home, '.claude', 'plugins', 'data');
+  fs.mkdirSync(path.join(root, 'lit-fetch-ladder-fetch-ladder'), { recursive: true });
+  assert.equal(defaultDataDir({}, home), path.join(root, 'lit-fetch-ladder-fetch-ladder'));  // named after this plugin's marketplace
+  assert.equal(defaultDataDir({}, home, noManifest), path.join(root, 'lit-fetch-ladder-fetch-ladder'));  // the one candidate
+  assert.equal(defaultDataDir({ CLAUDE_PLUGIN_DATA: '/given' }, home), '/given');
+  fs.mkdirSync(path.join(root, 'lit-fetch-ladder-other'));
+  assert.equal(defaultDataDir({}, home), path.join(root, 'lit-fetch-ladder-fetch-ladder'));  // the manifest decides
+  assert.equal(defaultDataDir({}, home, noManifest), '');  // two candidates and no manifest: do not guess
+  fs.rmSync(home, { recursive: true, force: true });
+});
 
 test('the browsers identify as desktop Chrome of the bundled version, without "Headless"', () => {
   for (const p of ['linux', 'darwin', 'win32']) {

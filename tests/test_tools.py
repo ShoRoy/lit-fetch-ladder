@@ -158,6 +158,17 @@ class Driver(Base):
         manifest, _ = self.run_batch(["10.1/paywalled"], cfg=dict(self.cfg, mode="none", suffix=None))
         self.assertEqual(manifest["items"][0]["auth_url"], "https://www.publisher-x.com/doi/10.1/paywalled")
 
+    def test_a_cookie_check_query_on_the_landing_page_is_dropped(self):
+        nature = "https://www.nature.com/articles/323533a0?error=cookies_not_supported&code=780e64f0"
+        with mock.patch.object(proxify, "landing_url", return_value=(nature, None)):
+            manifest, _ = self.run_batch(["10.1/paywalled"])
+        self.assertEqual(manifest["items"][0]["auth_url"], "https://www-nature-com.%s/articles/323533a0" % SUFFIX)
+        plain = "https://www.publisher-x.com/doi/10.1/x?code=keep&tab=2"  # a query that is not the cookie check stays
+        self.assertEqual(fetch.without_cookie_check(plain), plain)
+        # other parameters and the fragment survive; only the cookie check's two go
+        self.assertEqual(fetch.without_cookie_check("https://www.nature.com/articles/x?foo=1&error=cookies_not_supported&code=abc&bar=2#Sec1"),
+                         "https://www.nature.com/articles/x?foo=1&bar=2#Sec1")
+
     def test_rerun_skips_finished_rows(self):
         self.run_batch(["10.1/open", "10.1/paywalled"])
         resolve.resolve.reset_mock()
@@ -174,7 +185,7 @@ class Mark(Base):
     def test_only_outcome_states_can_be_written(self):
         self.run_batch(["10.1/paywalled"])
         with self.assertRaises(SystemExit):
-            fetch.mark("b1", self.tmp, "10.1/paywalled", "OA_FETCHED")
+            fetch.mark("b1", self.tmp, "10.1/paywalled", "NEEDS_AUTH")
 
     def test_unstaged_rows_cannot_be_marked_fetched_under_entitlement(self):
         self.run_batch(["10.1/open"])
@@ -220,6 +231,18 @@ class Mark(Base):
         with mock.patch.object(fetch, "openalex_abstract", return_value="An abstract."):
             row = fetch.mark("b1", self.tmp, "10.1/paywalled", "ABSTRACT_ONLY", email="me@example.org")
         self.assertEqual(row["abstract"], "An abstract.")
+
+    def test_an_open_copy_the_browser_saved_is_marked_with_its_file(self):
+        self.run_batch(["10.1/landing"])
+        pdf = os.path.join(self.tmp, "hal.pdf")
+        with open(pdf, "wb") as fh:
+            fh.write(b"%PDF-1.4 z")
+        with self.assertRaises(SystemExit):
+            fetch.mark("b1", self.tmp, "10.1/landing", "OA_FETCHED")  # the file is the point
+        row = fetch.mark("b1", self.tmp, "10.1/landing", "OA_FETCHED", path=pdf)
+        self.assertEqual((row["state"], row["kind"]), ("OA_FETCHED", "pdf"))
+        self.assertTrue(row["path"].startswith(os.path.join(self.tmp, "b1", "pdfs")))
+        self.assertEqual(row["url"], "https://repo.example/y")  # the landing the copy came from
 
 
 class _Resp:

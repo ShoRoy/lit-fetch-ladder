@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { CHROME_MAJOR, PLAYWRIGHT_MCP, SESSION_FILE, argValue, pluginOptions, proxySuffix, signInUrl } from './common.mjs';
+import { CHROME_MAJOR, PLAYWRIGHT_MCP, SESSION_FILE, argValue, defaultDataDir, pluginOptions, proxySuffix, signInUrl } from './common.mjs';
 import { hasDisplay } from './login.mjs';
 
 const rows = [];
@@ -17,7 +17,7 @@ const check = (ok, label, hint = '') => rows.push(`${ok ? ' ok ' : 'FIX '} ${lab
 const note = (label) => rows.push(`     ${label}`);
 
 const o = pluginOptions();
-const data = argValue('--data');
+const data = argValue('--data') || defaultDataDir();
 const email = argValue('--email', o.contact_email || '');
 const rawProxy = argValue('--proxy-suffix', o.proxy_suffix || '').trim();
 const suffix = proxySuffix(rawProxy);
@@ -38,6 +38,24 @@ const cacheRoots = [process.env.PLAYWRIGHT_BROWSERS_PATH,
   process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'ms-playwright')].filter(Boolean);
 const chromium = cacheRoots.some((r) => fs.existsSync(r) && fs.readdirSync(r).some((d) => d.startsWith('chromium')));
 check(chromium, 'Chromium for Playwright installed', `npx -y -p ${PLAYWRIGHT_MCP} playwright install chromium`);
+// A PDF address renders inside the headless browser unless the browser is told to download PDFs;
+// the managed policy AlwaysOpenPdfExternally does that (README, "PDFs that open in a viewer").
+// Playwright's build is Chrome for Testing, which reads its own policy directory (compiled in as
+// /etc/opt/chrome_for_testing/policies), not Chrome's or Chromium's.
+const PDF_POLICY_DIR = '/etc/opt/chrome_for_testing/policies/managed';
+let pdfPolicy = '';
+if (process.platform === 'linux') {
+  for (const dir of [PDF_POLICY_DIR, '/etc/opt/chrome/policies/managed', '/etc/chromium/policies/managed']) {
+    try {
+      if (fs.readdirSync(dir).some((f) => f.endsWith('.json')
+        && JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')).AlwaysOpenPdfExternally === true)) pdfPolicy = dir;
+    } catch { /* no such policy directory */ }
+    if (pdfPolicy) break;
+  }
+}
+if (pdfPolicy) check(pdfPolicy === PDF_POLICY_DIR, `PDF addresses download (policy AlwaysOpenPdfExternally in ${pdfPolicy})`,
+  `that directory belongs to another browser; Playwright's Chrome for Testing reads ${PDF_POLICY_DIR}`);
+else note('a PDF that opens in the browser\'s viewer is saved as page text; a policy makes it download (README, "PDFs that open in a viewer")');
 
 check(/.+@.+/.test(email), 'contact email set', 'set "Your email" in /config under lit-fetch-ladder (Unpaywall requires one)');
 note(`the browsers identify as desktop Chrome ${CHROME_MAJOR}, without the word "Headless"`);
@@ -57,8 +75,10 @@ if (!suffix) {
     check(hours < 12, `saved library login: ${hours.toFixed(1)} h old`, 'probably expired; run /lit-fetch-ladder:login');
     check(privateFile, 'saved login readable only by you', `chmod 600 "${sess}"`);
   } else {
-    check(false, 'saved library login', 'run /lit-fetch-ladder:login (the login opens a browser window)');
+    check(false, 'saved library login', data ? 'run /lit-fetch-ladder:login (the login opens a browser window)'
+      : 'no plugin data directory found; pass --data <dir> (Claude Code sets it when it runs the doctor)');
   }
+  if (data) note(`plugin data: ${data}`);
   check(hasDisplay(), 'a display for the sign-in window', 'see the README section "Signing in from a container"');
 }
 

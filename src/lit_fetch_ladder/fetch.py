@@ -28,7 +28,7 @@ from . import net, proxify, resolve
 
 DOI_RE = re.compile(r"^10\.\d{4,9}/\S+$")
 TERMINAL = {"OA_FETCHED", "OA_LANDING", "PROXY_FETCHED", "ABSTRACT_ONLY", "EXCLUDED"}
-MARKABLE = {"PROXY_FETCHED", "ABSTRACT_ONLY", "EXCLUDED", "ERROR"}
+MARKABLE = {"OA_FETCHED", "PROXY_FETCHED", "ABSTRACT_ONLY", "EXCLUDED", "ERROR"}
 MODES = ("ezproxy-host", "none")
 DAILY_CAP, DEFAULT_PAGES_PER_PAPER = 60, 5
 
@@ -65,12 +65,25 @@ def load(mpath, batch):
     return {"batch": batch, "created": datetime.datetime.now().isoformat(timespec="seconds"), "items": []}
 
 
+def without_cookie_check(url):
+    """A landing page reached by a script can carry the publisher's cookie-check query (Nature:
+    ?error=cookies_not_supported&code=...). Through the proxy that page shows the access options
+    instead of the article, while the plain address grants access, so the query is dropped."""
+    p = urllib.parse.urlsplit(url)
+    q = urllib.parse.parse_qsl(p.query, keep_blank_values=True)
+    if ("error", "cookies_not_supported") not in q:
+        return url
+    q = [(k, v) for k, v in q if k not in ("error", "code")]
+    return urllib.parse.urlunsplit((p.scheme, p.netloc, p.path, urllib.parse.urlencode(q), p.fragment))
+
+
 def auth_url_for(doi, cfg):
     """Where the library browser should open this paper: the publisher landing page,
     rewritten to the proxy form unless the network itself is entitled (mode none)."""
     landing, _ = proxify.landing_url(doi)
     if not landing or urllib.parse.urlsplit(landing).hostname in (None, "doi.org"):
         return None
+    landing = without_cookie_check(landing)
     return proxify.proxify_url(landing, cfg["suffix"]) if cfg["mode"] == "ezproxy-host" else landing
 
 
@@ -200,6 +213,8 @@ def mark(batch, base, doi, state, path=None, note=None, email=None):
     """Record the outcome of the library browser's attempt on one staged paper."""
     if state not in MARKABLE:
         raise SystemExit("error: --state must be one of %s" % ", ".join(sorted(MARKABLE)))
+    if state == "OA_FETCHED" and not path:
+        raise SystemExit("error: OA_FETCHED needs --path, the open copy the browser saved")
     rundir, mpath = paths(base, batch)
     manifest = load(mpath, batch)
     d = net.norm_doi(doi)
@@ -223,7 +238,7 @@ def mark(batch, base, doi, state, path=None, note=None, email=None):
     row["state"] = state
     # Saved page text is checked, so an abstract-only snapshot cannot pass silently for the paper.
     row.pop("warning", None)
-    if state == "PROXY_FETCHED" and row.get("kind") == "fulltext" and row.get("path") \
+    if state in ("PROXY_FETCHED", "OA_FETCHED") and row.get("kind") == "fulltext" and row.get("path") \
             and not has_references(row["path"]):
         row["warning"] = ABSTRACT_ONLY_WARNING
     if note is not None:

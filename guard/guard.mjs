@@ -432,16 +432,58 @@ const SHELL_TOOLS = new Set(['Bash', 'PowerShell', 'Monitor']);
 const FILE_TOOLS = new Set(['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Grep', 'Glob']);
 // zotero-cli (it ships with Zotero MCP) and the Zotero MCP tools can trash, merge, bulk-edit
 // and switch the user's library. Filing a batch only adds, attaches and annotates, so these ask.
-const ZOTERO_CLI_RE = /\bzotero-cli\b[^|;&\n]*\b(delete|merge|batch|edit|switch)\b/;
+// The shell text is read with quotes and backslashes removed and line continuations joined, and
+// without regard to case, so a split, escaped or wrapped verb is still the verb; the command is
+// the first word after zotero-cli's global flags (zotero-mcp 0.15.2), so a search for "batch
+// normalization" does not ask and a note or annotation update does. An expanded, encoded or
+// staged command stays a documented limit of a pattern match.
+const ZOTERO_CLI_RE = /\b(?:zotero-cli(?:\.exe)?|python3?(?:\.\d+)?(?:\s+-\w+)*\s+-m\s+zotero_mcp\.cli_standalone)(?:\s+(?:-v+|--verbose|--json|--))*\s+\$?(?:delete|edit|batch|duplicates\s+merge|library\s+(?:switch|reset)|tags\s[^|;&\n]*--rem\w*|notes\s+(?:update|delete)|annotations\s+(?:update|delete)|collections\s+(?:update|manage))\b/i;
 // The plugin's own undo: `lfl zotero --trash KEY...` moves a listed set in one command, so one ask covers the list.
-const LFL_TRASH_RE = /\blfl(?:\.py)?\b[^|;&\n]*\bzotero\b[^|;&\n]*--trash\b/;
-const ZOTERO_MCP_RE = /^mcp__.+__zotero_(delete_item|delete_collection|delete_annotation|merge_duplicates|batch_update|switch_library|manage_note)$/;
-const ZOTERO_ASK = 'can trash, merge, edit or switch your Zotero library; filing a fetched batch never needs it. Confirm it is part of what you asked for.';
+const LFL_TRASH_RE = /\b(?:lfl(?:\.py)?|lit_fetch_ladder(?:\.cli)?)\b[^|;&\n]*\bzotero\b[^|;&\n]*--trash\b/i;
+// Inline code against the plugin's or zotero-mcp's modules, which filing never needs.
+const ZOTERO_CODE_RE = /\b(?:from|import)\s+(?:zotero_mcp|lit_fetch_ladder)\b|\blit_fetch_ladder\.zotero\b|\bzotero\.trash\s*\(|\bzotero_mcp\.(?:tools|cli_standalone)\b/i;
+// Credentials or the target library set on the command line would send every write elsewhere;
+// zotero-mcp's setup and its local-write authorisation are the user's to run. The upload timeout
+// changes no destination, so setting it does not ask.
+const ZOTERO_ENV_RE = /\bZOTERO_(?:API_KEY|LIBRARY_ID|LIBRARY_TYPE|LOCAL(?:_API_KEY)?|WEBDAV_(?!TIMEOUT=)\w+)=/i;
+const ZOTERO_MCP_CMD_RE = /\bzotero-mcp\s+(?:setup|authorize-local)\b/i;
+const ZOTERO_MCP_RE = /^mcp__.+__zotero_(delete_item|delete_collection|delete_annotation|merge_duplicates|batch_update|switch_library|manage_note|update_item|set_item_collections|set_item_parent|update_collection|update_annotation|remove_item_relation|authorize_local_writes|attach_file|add_item)$/;
+const ZOTERO_ASK = 'can trash, merge, edit or switch your Zotero library, or authorise local writes to it; filing a fetched batch never needs it. Confirm it is part of what you asked for.';
+const SECRET_DENY = 'the saved library login and the guard state are not readable by the agent.';
 
-function judgeZotero(tool, input) {
+// The shell text as the Zotero rules read it.
+function zoteroText(command) {
+  return command.replace(/\\\r?\n/g, ' ').replace(/\\(?=[A-Za-z-])/g, '').replace(/["']/g, '');
+}
+
+// Shell commands, judged without the plugin data directory: the Zotero rules need none.
+function judgeZoteroShell(command) {
+  const c = zoteroText(command);
+  if (ZOTERO_CLI_RE.test(c)) return out('ask', `this zotero-cli command ${ZOTERO_ASK}`);
+  if (LFL_TRASH_RE.test(c)) return out('ask', 'this command moves the listed Zotero items to the trash, one confirmation for the whole list; filing a batch never needs it. Confirm the list is what you asked for.');
+  if (ZOTERO_CODE_RE.test(c)) return out('ask', 'this runs code against the Zotero modules directly, which can do anything to your library; filing a batch never needs it. Confirm it is part of what you asked for.');
+  if (ZOTERO_ENV_RE.test(c)) return out('ask', 'this sets Zotero credentials or the target library on the command line, which would send every write elsewhere; filing a batch never needs it. Confirm it is part of what you asked for.');
+  if (ZOTERO_MCP_CMD_RE.test(c)) return out('ask', 'zotero-mcp setup and its local-write authorisation are yours to run, not the agent\'s. Confirm it is part of what you asked for.');
+  return null;
+}
+
+function judgeZotero(cfg, tool, input) {
   const m = ZOTERO_MCP_RE.exec(tool);
   if (!m) return null;
-  if (m[1] === 'manage_note' && input.action !== 'delete') return null;
+  if (m[1] === 'attach_file' || m[1] === 'add_item') {
+    // Adding and attaching are what filing does. A file from the plugin's own secret or state
+    // directory is refused: the server would read it as the user and upload it to the library.
+    for (const v of [input.file_path, input.source]) {
+      if (typeof v !== 'string' || !v) continue;
+      if (v.includes('library-state') || v.includes('login-raw') || v.includes(STATE_FILE)) return out('deny', SECRET_DENY);
+      if (cfg.data) {
+        const p = norm(v);
+        if ([cfg.secretDir, cfg.stateDir].map(norm).some((root) => p === root || p.startsWith(root + path.sep))) return out('deny', SECRET_DENY);
+      }
+    }
+    return null;
+  }
+  if (m[1] === 'manage_note' && String(input.action || '').trim().toLowerCase() === 'create') return null;
   return out('ask', `"${tool}" ${ZOTERO_ASK}`);
 }
 
@@ -462,7 +504,7 @@ function judgeFiles(cfg, tool, input) {
       const p = norm(input[k]);
       // A target inside a protected dir, or a search rooted above one (Grep/Glob recurse).
       const hit = protectedRoots.some((root) => inside(p, root) || ((tool === 'Grep' || tool === 'Glob') && inside(root, p)));
-      if (hit) return out('deny', 'the saved library login and the guard state are not readable by the agent.');
+      if (hit) return out('deny', SECRET_DENY);
     }
   }
   if (SHELL_TOOLS.has(tool) && typeof input.command === 'string') {
@@ -479,8 +521,6 @@ function judgeFiles(cfg, tool, input) {
     if (/scripts[\\/]+login\.mjs/.test(c)) {
       return out('deny', 'the library sign-in is run by the user in their own terminal, never by the agent (see /lit-fetch-ladder:login).');
     }
-    if (ZOTERO_CLI_RE.test(c)) return out('ask', `this zotero-cli command ${ZOTERO_ASK}`);
-    if (LFL_TRASH_RE.test(c)) return out('ask', 'this command moves the listed Zotero items to the trash, one confirmation for the whole list; filing a batch never needs it. Confirm the list is what you asked for.');
   }
   if (tool === 'WebFetch' && typeof input.url === 'string' && cfg.mode === 'ezproxy-host') {
     const h = hostOf(input.url);
@@ -504,7 +544,11 @@ function preToolUse(cfg, ev, now) {
     }
   }
   try {
-    return judgeZotero(ev.tool_name || '', input) || judgeFiles(cfg, ev.tool_name || '', input);
+    const tool = ev.tool_name || '';
+    const shell = SHELL_TOOLS.has(tool) && typeof input.command === 'string';
+    // A deny from the file rules outranks a Zotero ask; the Zotero shell rules then run even
+    // when there is no plugin data directory to protect.
+    return judgeZotero(cfg, tool, input) || judgeFiles(cfg, tool, input) || (shell ? judgeZoteroShell(input.command) : null);
   } catch {
     return null;
   }
