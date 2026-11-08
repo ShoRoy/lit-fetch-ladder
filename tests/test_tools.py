@@ -477,6 +477,14 @@ class Matches(unittest.TestCase):
         page = self.text("Deep Residual Learning for Image Recognition. K. Zhang et al.")
         self.assertTrue(resolve.matches(page, "Deep residual learning for image recognition: a journal version", "Kaiming He"))
 
+    def test_a_title_of_record_that_differs_from_the_pdfs_passes_with_its_first_author(self):
+        # OpenAlex titles arXiv 1406.2661 "Generative Adversarial Networks"; the PDF says "Nets".
+        page = self.text("Generative Adversarial Nets\nIan J. Goodfellow, Jean Pouget-Abadie\n"
+                         "We propose a new framework for estimating generative models via an adversarial process")
+        self.assertTrue(resolve.matches(page, "Generative Adversarial Networks", "Ian Goodfellow"))
+        self.assertFalse(resolve.matches(page, "Generative Adversarial Networks", "Ashish Vaswani"))
+        self.assertFalse(resolve.matches(page, "Generative Adversarial Networks", None))
+
     def test_no_title_means_no_check(self):
         self.assertIsNone(resolve.matches(self.text("anything"), None, None))
 

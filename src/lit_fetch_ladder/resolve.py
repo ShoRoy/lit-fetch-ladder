@@ -98,11 +98,11 @@ def download(url, outdir):
     return path, None if is_pdf else "not a PDF (an HTML landing or challenge page)"
 
 
-def _fold(s):
-    """Letters and digits only, lower-case ASCII: ligatures, accents, markup, hyphenation and line
-    breaks do not change it."""
+def _fold(s, sep=""):
+    """Letters and digits only, lower-case ASCII, each other run replaced by sep: ligatures, accents,
+    markup, hyphenation and line breaks do not change it."""
     s = unicodedata.normalize("NFKD", re.sub(r"<[^>]+>", " ", s or ""))
-    return re.sub(r"[^a-z0-9]+", "", s.encode("ascii", "ignore").decode().lower())
+    return re.sub(r"[^a-z0-9]+", sep, s.encode("ascii", "ignore").decode().lower())
 
 
 def page_text(path):
@@ -125,17 +125,22 @@ def page_text(path):
 
 def matches(path, title, author=None):
     """Whether a file is the paper of record: its title, or the part before a colon, is on the
-    first pages, and so is the first author's surname when it is long enough to tell. True or
-    False; None when the file cannot be read or there is no title to look for."""
+    first pages, and so is the first author's surname when it is long enough to tell. A title of
+    record can differ from the file's ("Networks" for "Nets"): with the first author found, most
+    of the title's longer words will do. True or False; None when the file cannot be read or there
+    is no title to look for."""
     text = page_text(path)
     if text is None or not _fold(title):
         return None
-    text = _fold(text)
-    main = _fold(title.split(":")[0])
-    if _fold(title) not in text and not (len(main) >= 12 and main in text):
-        return False
+    words = _fold(text, " ").split()
+    text = "".join(words)
     surname = _fold((author or "").split()[-1]) if (author or "").split() else ""
-    return len(surname) < 4 or surname in text
+    by_author = len(surname) >= 4 and surname in text
+    main = _fold(title.split(":")[0])
+    if _fold(title) in text or (len(main) >= 12 and main in text):
+        return len(surname) < 4 or by_author
+    longer = [w for w in _fold(title, " ").split() if len(w) >= 4]
+    return by_author and bool(longer) and sum(w in set(words) for w in longer) >= 0.6 * len(longer)
 
 
 def resolve(email, doi=None, title=None, download_dir=None):
