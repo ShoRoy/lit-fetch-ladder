@@ -5,11 +5,17 @@ all count. No authentication and no proxy are involved here; a paper with no ope
 copy is reported as such and becomes a candidate for the library browser.
 """
 import os
+import re
+import shutil
+import subprocess
+import unicodedata
 import urllib.parse
 
 from . import net
 
 VER_RANK = {"publishedVersion": 0, "acceptedVersion": 1, "submittedVersion": 2}
+ARXIV_DOI = re.compile(r"^10\.48550/arxiv\.(.+)$", re.IGNORECASE)
+TRIES = 3  # PDF candidates tried before a paper falls back to its landing page
 
 # Return codes, kept from the command-line tool this was ported from.
 FOUND, NO_OA, UNRESOLVED, ERROR = 0, 3, 4, 2
@@ -37,7 +43,8 @@ def from_unpaywall(doi, email):
     if err:
         return None, [], err
     meta = {"title": js.get("title"), "year": js.get("year"),
-            "is_oa": js.get("is_oa"), "oa_status": js.get("oa_status")}
+            "is_oa": js.get("is_oa"), "oa_status": js.get("oa_status"),
+            "author": ((js.get("z_authors") or [{}])[0] or {}).get("family")}
     locs = [_loc(l.get("url_for_pdf"), l.get("url_for_landing_page") or l.get("url"),
                  l.get("version"), l.get("license"), l.get("host_type"), "unpaywall")
             for l in [js.get("best_oa_location")] + (js.get("oa_locations") or []) if l]
@@ -50,8 +57,9 @@ def from_openalex(doi, email):
     if err:
         return None, [], err
     oa = js.get("open_access") or {}
+    first = ((js.get("authorships") or [{}])[0] or {}).get("author") or {}
     meta = {"title": js.get("title"), "year": js.get("publication_year"),
-            "is_oa": oa.get("is_oa"), "oa_status": oa.get("oa_status")}
+            "is_oa": oa.get("is_oa"), "oa_status": oa.get("oa_status"), "author": first.get("display_name")}
     cand = ([js["best_oa_location"]] if js.get("best_oa_location") else []) \
         + [l for l in (js.get("locations") or []) if l.get("is_oa")]
     locs = [_loc(l.get("pdf_url"), l.get("landing_page_url"), l.get("version"), l.get("license"),
@@ -66,7 +74,10 @@ def _rank(locs):
         if key and key not in seen:
             seen.add(key)
             uniq.append(c)
-    uniq.sort(key=lambda c: (0 if c["pdf"] else 1, VER_RANK.get(c["version"], 3)))
+    # A PDF first; then arXiv's own copy of an arXiv paper; then a copy whose host is known, since
+    # OpenAlex lists files with no source that turn out to be other papers; then the version.
+    uniq.sort(key=lambda c: (0 if c["pdf"] else 1, 0 if c["source"] == "arxiv" else 1,
+                             0 if c["host"] else 1, VER_RANK.get(c["version"], 3)))
     return uniq
 
 
@@ -87,6 +98,46 @@ def download(url, outdir):
     return path, None if is_pdf else "not a PDF (an HTML landing or challenge page)"
 
 
+def _fold(s):
+    """Letters and digits only, lower-case ASCII: ligatures, accents, markup, hyphenation and line
+    breaks do not change it."""
+    s = unicodedata.normalize("NFKD", re.sub(r"<[^>]+>", " ", s or ""))
+    return re.sub(r"[^a-z0-9]+", "", s.encode("ascii", "ignore").decode().lower())
+
+
+def page_text(path):
+    """The text of a file's first two pages; saved page text is read as it is. None when a PDF
+    cannot be read: no pdftotext, or a scan without a text layer."""
+    with open(path, "rb") as fh:
+        if fh.read(5) != b"%PDF-":
+            fh.seek(0)
+            return fh.read().decode("utf-8", "ignore")
+    exe = shutil.which("pdftotext")
+    if not exe:
+        return None
+    try:
+        p = subprocess.run([exe, "-q", "-f", "1", "-l", "2", path, "-"], capture_output=True,
+                           text=True, errors="ignore", timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return p.stdout if p.returncode == 0 and len(_fold(p.stdout)) >= 200 else None
+
+
+def matches(path, title, author=None):
+    """Whether a file is the paper of record: its title, or the part before a colon, is on the
+    first pages, and so is the first author's surname when it is long enough to tell. True or
+    False; None when the file cannot be read or there is no title to look for."""
+    text = page_text(path)
+    if text is None or not _fold(title):
+        return None
+    text = _fold(text)
+    main = _fold(title.split(":")[0])
+    if _fold(title) not in text and not (len(main) >= 12 and main in text):
+        return False
+    surname = _fold((author or "").split()[-1]) if (author or "").split() else ""
+    return len(surname) < 4 or surname in text
+
+
 def resolve(email, doi=None, title=None, download_dir=None):
     """Find (and optionally download) an open-access copy. Returns (code, result)."""
     candidates = None
@@ -103,15 +154,30 @@ def resolve(email, doi=None, title=None, download_dir=None):
     if eu and eo:
         return ERROR, {"doi": doi, "error": "unpaywall: %s; openalex: %s" % (eu, eo)}
     meta = {k: ((mu or {}).get(k) if (mu or {}).get(k) is not None else (mo or {}).get(k))
-            for k in ("title", "year", "is_oa", "oa_status")}
-    locs = _rank((lu or []) + (lo or []))
+            for k in ("title", "year", "is_oa", "oa_status", "author")}
+    arxiv = ARXIV_DOI.match(doi)
+    own = [_loc("https://arxiv.org/pdf/" + arxiv.group(1), "https://arxiv.org/abs/" + arxiv.group(1),
+                "submittedVersion", None, "arXiv", "arxiv")] if arxiv else []
+    locs = _rank(own + (lu or []) + (lo or []))
     result = dict(meta, doi=doi, oa_locations=locs, downloaded=None,
                   candidates=candidates)
     if download_dir and locs:
-        target = next((c for c in locs if c["pdf"]), None)
-        if target:
-            path, warn = download(target["pdf"], download_dir)
-            result["downloaded"] = {"path": path, "url": target["pdf"], "warning": warn}
-        else:
-            result["downloaded"] = {"path": None, "warning": "no direct PDF link among open copies; landing pages only"}
+        # Each candidate is checked against the paper; a file that is not a PDF, or is another
+        # paper, is deleted and the next candidate tried.
+        result["downloaded"] = {"path": None, "warning": "no direct PDF link among open copies; landing pages only"}
+        warnings = []
+        for c in [c for c in locs if c["pdf"]][:TRIES]:
+            path, warn = download(c["pdf"], download_dir)
+            ok = matches(path, meta["title"], meta["author"]) if path and not warn else None
+            if ok is False:
+                warn = "open copy did not match the paper"
+            if path and warn:
+                os.remove(path)
+                path = None
+            if warn and warn not in warnings:
+                warnings.append(warn)
+            result["downloaded"] = {"path": path, "url": c["pdf"], "verified": ok,
+                                    "warning": "; ".join(warnings) if not path else None}
+            if path:
+                break
     return (FOUND if locs else NO_OA), result

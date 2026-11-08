@@ -337,5 +337,186 @@ class Cli(unittest.TestCase):
         self.assertEqual([(c["mode"], c["suffix"]) for c in seen], [("none", None), ("ezproxy-host", SUFFIX)])
 
 
+# OpenAlex's record for the arXiv DOI of "Attention Is All You Need" (2026-11-08), trimmed to the
+# fields the plugin reads. Next to arXiv it lists PDFs on a preprint server labelled acceptedVersion
+# with no source; one of them is an unrelated paper, the other answers 404.
+ATTENTION_OPENALEX = {
+    "title": "Attention Is All You Need", "publication_year": 2017,
+    "open_access": {"is_oa": True, "oa_status": "green"},
+    "authorships": [{"author": {"display_name": "Ashish Vaswani"}}],
+    "best_oa_location": {"is_oa": True, "pdf_url": "https://arxiv.org/pdf/1706.03762",
+                         "landing_page_url": "http://arxiv.org/abs/1706.03762", "version": "submittedVersion",
+                         "source": {"display_name": "arXiv (Cornell University)"}},
+    "locations": [
+        {"is_oa": True, "pdf_url": "https://arxiv.org/pdf/1706.03762", "landing_page_url": "http://arxiv.org/abs/1706.03762",
+         "version": "submittedVersion", "source": {"display_name": "arXiv (Cornell University)"}},
+        {"is_oa": True, "pdf_url": "https://langtaosha.org.cn/index.php/lts/preprint/download/10/108",
+         "landing_page_url": "https://doi.org/10.65215/r5bs2d54", "version": "acceptedVersion", "source": None},
+        {"is_oa": True, "pdf_url": "https://langtaosha.org.cn/lts/en/preprint/download/49/231",
+         "landing_page_url": "https://doi.org/10.65215/ne77pf66", "version": "acceptedVersion", "source": None},
+    ],
+}
+ATTENTION_PDF = b"%PDF-1.5\nAttention Is All You Need\nAshish Vaswani, Noam Shazeer, Google Brain"
+OTHER_PDF = b"%PDF-1.5\nSingle-cell identification with quantum-enhanced nuclear magnetic resonance"
+
+
+def first_pages(path):
+    """Stands in for pdftotext: the text after a fake PDF's first line, or the file's text."""
+    with open(path, "rb") as fh:
+        data = fh.read()
+    return data.split(b"\n", 1)[1].decode() if data.startswith(b"%PDF-") else data.decode()
+
+
+def tiny_pdf(path, lines):
+    """A one-page PDF whose page shows `lines`, for the real pdftotext."""
+    text = " ".join("(%s) Tj 0 -14 Td" % l for l in lines)
+    stream = ("BT /F1 10 Tf 40 760 Td %s ET" % text).encode()
+    objs = [b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R "
+            b"/Resources << /Font << /F1 5 0 R >> >> >>",
+            b"<< /Length %d >>\nstream\n%s\nendstream" % (len(stream), stream),
+            b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+    out, offsets = bytearray(b"%PDF-1.4\n"), []
+    for n, body in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n%s\nendobj\n" % (n, body)
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
+    out += b"".join(b"%010d 00000 n \n" % o for o in offsets)
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+    with open(path, "wb") as fh:
+        fh.write(bytes(out))
+
+
+class OpenCopy(unittest.TestCase):
+    """Rung 1 takes a file only when it is the paper: the right location first, and a check of the
+    downloaded file against the title and first author of record."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+        self.web = {}
+
+        def fake_get(url, want="json"):
+            if url.startswith("https://api.unpaywall.org/"):
+                return None, "HTTP 404"  # Unpaywall does not carry DataCite DOIs
+            if url.startswith("https://api.openalex.org/"):
+                return self.openalex, None
+            return (self.web[url], None) if url in self.web else (None, "HTTP 404")
+        for p in (mock.patch.object(net, "get", side_effect=fake_get),
+                  mock.patch.object(resolve, "page_text", side_effect=first_pages),
+                  mock.patch.object(proxify, "landing_url", return_value=("https://arxiv.org/abs/1706.03762", None))):
+            p.start()
+            self.addCleanup(p.stop)
+        self.openalex = ATTENTION_OPENALEX
+        self.web = {"https://arxiv.org/pdf/1706.03762": ATTENTION_PDF,
+                    "https://langtaosha.org.cn/lts/en/preprint/download/49/231": OTHER_PDF}
+
+    def test_an_arxiv_doi_takes_arxivs_pdf_before_unhosted_copies(self):
+        code, res = resolve.resolve("me@example.org", doi="10.48550/arXiv.1706.03762", download_dir=self.tmp)
+        self.assertEqual(res["oa_locations"][0]["pdf"], "https://arxiv.org/pdf/1706.03762")
+        self.assertEqual((res["downloaded"]["url"], res["downloaded"]["verified"]),
+                         ("https://arxiv.org/pdf/1706.03762", True))
+
+    def test_a_copy_without_a_host_ranks_below_a_hosted_one(self):
+        locs = resolve._rank([resolve._loc("https://x.example/a.pdf", None, "acceptedVersion", None, None, "openalex"),
+                              resolve._loc("https://repo.example/b.pdf", None, "submittedVersion", None, "Repo", "openalex")])
+        self.assertEqual(locs[0]["pdf"], "https://repo.example/b.pdf")
+
+    def test_a_file_that_is_another_paper_is_dropped_and_the_next_copy_tried(self):
+        self.openalex = dict(ATTENTION_OPENALEX, locations=[
+            {"is_oa": True, "pdf_url": "https://journal.example/wrong.pdf", "version": "publishedVersion",
+             "source": {"display_name": "Journal"}},
+            {"is_oa": True, "pdf_url": "https://repo.example/right.pdf", "version": "acceptedVersion",
+             "source": {"display_name": "Repo"}}], best_oa_location=None)
+        self.web = {"https://journal.example/wrong.pdf": OTHER_PDF, "https://repo.example/right.pdf": ATTENTION_PDF}
+        code, res = resolve.resolve("me@example.org", doi="10.1/attention", download_dir=self.tmp)
+        self.assertEqual((res["downloaded"]["url"], res["downloaded"]["verified"]), ("https://repo.example/right.pdf", True))
+        self.assertEqual(os.listdir(self.tmp), ["right.pdf"])  # the wrong file is not kept
+
+    def test_when_no_copy_is_the_paper_the_row_is_not_fetched(self):
+        self.web = {"https://arxiv.org/pdf/1706.03762": OTHER_PDF}
+        manifest, _ = fetch.run(["10.48550/arXiv.1706.03762"], "b1", self.tmp, dict(CFG, mode="none"))
+        row = manifest["items"][0]
+        self.assertNotEqual(row["state"], "OA_FETCHED")
+        self.assertIn("did not match the paper", row["note"])
+        self.assertEqual(os.listdir(os.path.join(self.tmp, "b1", "pdfs")), [])
+
+    def test_a_file_that_cannot_be_checked_is_kept_unconfirmed(self):
+        with mock.patch.object(resolve, "page_text", return_value=None):  # no pdftotext, or a scan
+            manifest, mpath = fetch.run(["10.48550/arXiv.1706.03762"], "b1", self.tmp, dict(CFG, mode="none"))
+        row = manifest["items"][0]
+        self.assertEqual((row["state"], row["verified"]), ("OA_FETCHED", None))
+        self.assertIn("lfl confirm", fetch.report(manifest, mpath))
+        self.assertTrue(fetch.confirm("b1", self.tmp, row["doi"])["verified"])
+
+
+class Matches(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+
+    def text(self, body):
+        path = os.path.join(self.tmp, "page.md")
+        with open(path, "w") as fh:
+            fh.write(body)
+        return path
+
+    def test_saved_text_is_matched_through_line_breaks_hyphens_case_and_ligatures(self):
+        page = self.text("ATTEN-\ntion is all\nyou need\nAshish Vaswani")
+        self.assertTrue(resolve.matches(page, "Attention Is All You Need", "Ashish Vaswani"))
+        self.assertTrue(resolve.matches(self.text("Eﬃcient estimation by Mikolov"), "Efficient estimation", "Tomas Mikolov"))
+
+    def test_the_wrong_title_or_first_author_fails(self):
+        page = self.text("Attention Is All You Need, by Somebody Else")
+        self.assertFalse(resolve.matches(page, "Single-cell identification with NMR", None))
+        self.assertFalse(resolve.matches(page, "Attention Is All You Need", "Ashish Vaswani"))
+
+    def test_a_subtitle_may_differ_and_a_short_surname_is_not_tested(self):
+        # "He" is too short to tell anything apart; the page does not carry it and still passes.
+        page = self.text("Deep Residual Learning for Image Recognition. K. Zhang et al.")
+        self.assertTrue(resolve.matches(page, "Deep residual learning for image recognition: a journal version", "Kaiming He"))
+
+    def test_no_title_means_no_check(self):
+        self.assertIsNone(resolve.matches(self.text("anything"), None, None))
+
+    @unittest.skipUnless(shutil.which("pdftotext"), "pdftotext is not installed")
+    def test_a_real_pdf_is_read_with_pdftotext(self):
+        pdf = os.path.join(self.tmp, "p.pdf")
+        tiny_pdf(pdf, ["Attention Is All You Need", "Ashish Vaswani, Google Brain"]
+                 + ["The dominant sequence transduction models are based on complex recurrent networks."] * 4)
+        self.assertTrue(resolve.matches(pdf, "Attention Is All You Need", "Ashish Vaswani"))
+        self.assertFalse(resolve.matches(pdf, "Single-cell identification with NMR", None))
+        tiny_pdf(pdf, ["x"])  # next to no text: a scan, which cannot be checked
+        self.assertIsNone(resolve.matches(pdf, "Attention Is All You Need", None))
+
+
+class MarkChecks(Base):
+    def test_a_marked_file_is_checked_and_the_staging_note_dropped(self):
+        self.run_batch(["10.1/paywalled"])
+        page = os.path.join(self.tmp, "page.md")
+        with open(page, "w") as fh:
+            fh.write("Closed, by A. Author. ... References")
+        row = fetch.mark("b1", self.tmp, "10.1/paywalled", "PROXY_FETCHED", path=page)
+        self.assertTrue(row["verified"])
+        self.assertIsNone(row.get("note"))  # was "no open copy; staged for the library browser"
+        with open(page, "w") as fh:
+            fh.write("Another paper altogether. ... References")
+        self.assertFalse(fetch.mark("b1", self.tmp, "10.1/paywalled", "PROXY_FETCHED", path=page)["verified"])
+
+    def test_mark_records_where_the_file_came_from(self):
+        self.run_batch(["10.1/landing"])
+        pdf = os.path.join(self.tmp, "a.pdf")
+        with open(pdf, "wb") as fh:
+            fh.write(b"%PDF-1.4 z")
+        row = fetch.mark("b1", self.tmp, "10.1/landing", "OA_FETCHED", path=pdf, url="https://arxiv.org/pdf/1")
+        self.assertEqual(row["url"], "https://arxiv.org/pdf/1")
+
+    def test_confirm_needs_a_fetched_file(self):
+        self.run_batch(["10.1/paywalled"])
+        with self.assertRaises(SystemExit):
+            fetch.confirm("b1", self.tmp, "10.1/paywalled")
+
+
 if __name__ == "__main__":
     unittest.main()

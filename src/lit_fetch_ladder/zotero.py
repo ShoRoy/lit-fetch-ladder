@@ -3,7 +3,8 @@
 Zotero MCP adds a paper by DOI with its open-access PDF; for a paywalled paper it stores the
 metadata and no file. This files what the batch could read:
 
-    OA_FETCHED, PROXY_FETCHED   the item, the PDF or the saved page text, and a note
+    OA_FETCHED, PROXY_FETCHED   the item, the PDF or the saved page text, and a note, once the
+                                file was found to be the paper (the row's `verified`)
     every other state           not filed; listed in the report. A paper without full text
                                 (ABSTRACT_ONLY) serves that round's review and nothing more.
 
@@ -258,6 +259,10 @@ def file_batch(batch, base, cli="zotero-cli", collection=None, refresh=False, dr
         if row.get("zotero") and not refresh:
             z = row["zotero"]
             lines.append("  filed %-13s %s -> %s (already, %s)" % (st, doi, z["key"], z["filed"]))
+            continue
+        if row.get("verified") is not True:
+            lines.append("  skip  %-13s %s (file not confirmed as the paper: read its first page, then "
+                         "lfl confirm %s --batch %s)" % (st, doi, doi, batch))
             continue
         add, att, note = plan(row, collection, batch)
         state = "attached" if att else ("not_attachable" if row.get("path") else None)

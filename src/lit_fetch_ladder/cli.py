@@ -1,4 +1,4 @@
-"""Command-line front end: `lfl discover|resolve|proxify|fetch|mark|show|zotero`."""
+"""Command-line front end: `lfl discover|resolve|proxify|fetch|mark|confirm|show|zotero`."""
 import argparse
 import json
 import os
@@ -57,6 +57,12 @@ def main(argv=None):
     m.add_argument("--state", required=True, choices=sorted(fetch.MARKABLE))
     m.add_argument("--path")
     m.add_argument("--note")
+    m.add_argument("--url", help="where the file came from, when not the landing page the row names")
+
+    c = sub.add_parser("confirm", help="record that you read the first page of a fetched file and it is the paper")
+    c.add_argument("doi")
+    c.add_argument("--batch", required=True)
+    c.add_argument("--base", default=_env("LFL_BASE", "lit-fetch-runs"))
 
     s = sub.add_parser("show", help="print a batch manifest")
     s.add_argument("--batch", required=True)
@@ -95,10 +101,21 @@ def main(argv=None):
 
     if a.cmd == "mark":
         row = fetch.mark(a.batch, a.base, a.doi, a.state, a.path, a.note,
-                         email=a.email or _env("LFL_EMAIL") or settings.plugin_option("contact_email"))
+                         email=a.email or _env("LFL_EMAIL") or settings.plugin_option("contact_email"), url=a.url)
         print("marked %s -> %s%s" % (row["doi"], row["state"], "  (%s)" % row["path"] if row.get("path") else ""))
         if row.get("warning"):
             print("WARNING: %s. Wait for the article body and save the page again, or mark it ABSTRACT_ONLY." % row["warning"])
+        if a.path and row.get("verified") is False:
+            print("WARNING: the paper's title (or first author) is not on the file's first pages, so it may be "
+                  "another paper. Read its first page; if it is the paper, run `lfl confirm %s --batch %s`." % (row["doi"], a.batch))
+        elif a.path and row.get("verified") is None:
+            print("NOTE: the file could not be checked against the paper (no pdftotext, or a scan). Read its "
+                  "first page; if it is the paper, run `lfl confirm %s --batch %s`." % (row["doi"], a.batch))
+        return 0
+
+    if a.cmd == "confirm":
+        row = fetch.confirm(a.batch, a.base, a.doi)
+        print("confirmed %s: %s is the paper" % (row["doi"], row["path"]))
         return 0
 
     email = net.contact_email(a.email)

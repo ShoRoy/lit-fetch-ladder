@@ -2,7 +2,8 @@
 
 Every request in a batch ends in exactly one recorded state:
 
-    OA_FETCHED     an open-access PDF was downloaded
+    OA_FETCHED     an open-access PDF was downloaded (and checked against the paper where it
+                   could be: `verified`)
     OA_LANDING     open access exists, but only as a landing page
     NEEDS_AUTH     no open copy; staged for the library browser
     PROXY_FETCHED  fetched by the library browser (written back with `mark`)
@@ -10,6 +11,9 @@ Every request in a batch ends in exactly one recorded state:
     EXCLUDED       resolved to the wrong paper, or dropped by the user
     UNRESOLVED     a title that matched no paper confidently
     ERROR          a network or resolver failure; retried on the next run
+
+A row's `verified` is True once its file was found to be the paper: by its title and first author
+on the first pages, or by a reader (`confirm`). Only verified rows are filed into Zotero.
 
 Rows staged for the library browser carry `auth_url`. The plugin's guard reads
 the active batch through <data>/active.json and lets the library browser open
@@ -100,13 +104,14 @@ def process(row, rundir, cfg):
         row.update(state="ERROR", note=res.get("error", "resolver or network error"))
         return row
 
-    row.update(doi=res["doi"], title=res.get("title"), year=res.get("year"))
+    row.update(doi=res["doi"], title=res.get("title"), year=res.get("year"), author=res.get("author"))
     if res.get("candidates"):
         row["candidates"] = res["candidates"]  # a title query: keep what it was chosen from
     if code == resolve.FOUND:
         dl = res.get("downloaded") or {}
         if dl.get("path") and not dl.get("warning"):
-            row.update(state="OA_FETCHED", path=dl["path"], url=dl["url"], sha256=sha256(dl["path"]), note=None)
+            row.update(state="OA_FETCHED", path=dl["path"], url=dl["url"], sha256=sha256(dl["path"]), note=None,
+                       verified=dl.get("verified"))
             return row
         if dl.get("path"):  # the "PDF" was an HTML page; do not keep it as a paper
             os.remove(dl["path"])
@@ -180,6 +185,14 @@ def report(manifest, mpath, pages_per_paper=DEFAULT_PAGES_PER_PAPER):
             lines.append("  - %s -> %s" % (i["doi"], i["auth_url"]))
         if len(todo) > 8:
             lines.append("  ... and %d more (see the manifest)" % (len(todo) - 8))
+    unchecked = [i for i in manifest["items"] if i.get("state") in ("OA_FETCHED", "PROXY_FETCHED")
+                 and i.get("path") and i.get("verified") is not True]
+    if unchecked:
+        lines.append("\n%d file(s) not confirmed as their paper: read the first page of each, and if it is the "
+                     "paper run `lfl confirm <DOI> --batch %s`. Only confirmed files are filed into Zotero."
+                     % (len(unchecked), manifest["batch"]))
+        for i in unchecked[:8]:
+            lines.append("  - %s  %s" % (i["doi"], i["path"]))
     titled = [i for i in manifest["items"] if i.get("candidates") and i.get("state") not in ("UNRESOLVED", "EXCLUDED")]
     if titled:
         lines.append("\n%d request(s) were bare titles: check each resolved to the right paper." % len(titled))
@@ -209,7 +222,7 @@ def openalex_abstract(doi, email):
     return " ".join(pos[i] for i in sorted(pos))
 
 
-def mark(batch, base, doi, state, path=None, note=None, email=None):
+def mark(batch, base, doi, state, path=None, note=None, email=None, url=None):
     """Record the outcome of the library browser's attempt on one staged paper."""
     if state not in MARKABLE:
         raise SystemExit("error: --state must be one of %s" % ", ".join(sorted(MARKABLE)))
@@ -234,16 +247,35 @@ def mark(batch, base, doi, state, path=None, note=None, email=None):
             os.makedirs(dest_dir, exist_ok=True)
             dest = os.path.join(dest_dir, os.path.basename(path))
             shutil.copy2(path, dest)
-        row.update(path=dest, sha256=sha256(dest), kind="pdf" if is_pdf else "fulltext")
+        row.update(path=dest, sha256=sha256(dest), kind="pdf" if is_pdf else "fulltext",
+                   verified=resolve.matches(dest, row.get("title"), row.get("author")))
     row["state"] = state
     # Saved page text is checked, so an abstract-only snapshot cannot pass silently for the paper.
     row.pop("warning", None)
     if state in ("PROXY_FETCHED", "OA_FETCHED") and row.get("kind") == "fulltext" and row.get("path") \
             and not has_references(row["path"]):
         row["warning"] = ABSTRACT_ONLY_WARNING
-    if note is not None:
+    if state in ("PROXY_FETCHED", "OA_FETCHED"):
+        row["note"] = note  # a staging remark ("no open copy; staged ...") no longer applies
+    elif note is not None:
         row["note"] = note
+    if url:
+        row["url"] = url  # where the file came from, when not the landing page the row names
     if state == "ABSTRACT_ONLY" and not row.get("abstract") and email:
         row["abstract"] = openalex_abstract(d, email)
+    write_json(mpath, manifest)
+    return row
+
+
+def confirm(batch, base, doi):
+    """Record that a reader opened the first page of a row's file and it is the paper: for a file
+    the check could not read (no pdftotext, a scan) or did not find the paper in."""
+    rundir, mpath = paths(base, batch)
+    manifest = load(mpath, batch)
+    d = net.norm_doi(doi)
+    row = next((i for i in manifest["items"] if i.get("doi") == d), None)
+    if not row or row.get("state") not in ("OA_FETCHED", "PROXY_FETCHED") or not row.get("path"):
+        raise SystemExit("error: %s in batch '%s' has no fetched file to confirm" % (d, batch))
+    row["verified"] = True
     write_json(mpath, manifest)
     return row

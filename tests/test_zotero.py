@@ -105,9 +105,9 @@ class Zotero(Base):
         with open(self.log) as fh:
             return [c for c in (json.loads(l) for l in fh) if c["args"][1] != "config"]
 
-    def finished_batch(self, text_ext=".yml"):
+    def finished_batch(self, text_ext=".yml", confirm=True):
         """A batch with one open PDF, one paper saved as page text through the library, one
-        abstract-only, and one still staged."""
+        abstract-only, and one still staged. With confirm, a reader has confirmed both files."""
         self.run_batch(["10.1/open", "10.1/paywalled", "10.1/landing", "10.1/broken"])
         dl = os.path.join(self.tmp, "downloads")
         os.makedirs(dl)
@@ -116,6 +116,15 @@ class Zotero(Base):
             fh.write("heading 1. Introduction ... heading References")
         fetch.mark("b1", self.tmp, "10.1/paywalled", "PROXY_FETCHED", path=page, note="viewer only; PDF is a manual export")
         fetch.mark("b1", self.tmp, "10.1/landing", "ABSTRACT_ONLY", note="the proxy returned an error page")
+        for doi in ("10.1/open", "10.1/paywalled") if confirm else ():
+            fetch.confirm("b1", self.tmp, doi)
+
+    def test_only_files_confirmed_as_the_paper_are_filed(self):
+        self.finished_batch(confirm=False)
+        lines, filed, ok = zotero.file_batch("b1", self.tmp, cli=self.cli)
+        self.assertEqual((filed, ok), (0, True))
+        self.assertIn("lfl confirm 10.1/open --batch b1", "\n".join(lines))
+        self.assertEqual(self.calls(), [])
 
     def test_files_what_the_batch_got_and_notes_how(self):
         self.finished_batch()
@@ -429,6 +438,7 @@ class Zotero(Base):
         with open(pdf, "wb") as fh:
             fh.write(b"%PDF-1.4 y")
         fetch.mark("b1", self.tmp, "10.1/paywalled", "PROXY_FETCHED", path=pdf)
+        fetch.confirm("b1", self.tmp, "10.1/paywalled")
         mpath = fetch.paths(self.tmp, "b1")[1]
         manifest = fetch.load(mpath, "b1")
         del manifest["items"][0]["kind"]  # a manifest written before `kind` existed
@@ -440,7 +450,7 @@ class Zotero(Base):
         self.run_batch(["10.1/open"])
         mpath = fetch.paths(self.tmp, "b1")[1]
         manifest = fetch.load(mpath, "b1")
-        manifest["items"][0]["doi"] = "10.48550/arxiv.1706.03762"  # a DataCite DOI, which CrossRef does not know
+        manifest["items"][0].update(doi="10.48550/arxiv.1706.03762", verified=True)  # a DataCite DOI, which CrossRef does not know
         fetch.write_json(mpath, manifest)
         lines, _, _ = zotero.file_batch("b1", self.tmp, cli=self.cli, dry_run=True)
         self.assertIn("zotero-cli add url https://arxiv.org/abs/1706.03762 -c lit-fetch-ladder/b1", "\n".join(lines))

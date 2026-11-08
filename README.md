@@ -50,7 +50,8 @@ npx -y -p @playwright/mcp@0.0.78 playwright install chromium
 /lit-fetch-ladder:doctor
 ```
 
-Requirements: Claude Code 2.1.271 or later (built and tested on 2.1.289), Node 18+, Python 3.9+. Tested on Linux. macOS and
+Requirements: Claude Code 2.1.271 or later (built and tested on 2.1.289), Node 18+, Python 3.9+.
+Optional: `pdftotext` (poppler-utils), so downloaded PDFs are checked without the agent reading them. Tested on Linux. macOS and
 Windows should work but are untested; reports are welcome.
 
 ## Sign in to your library (rung 3 only)
@@ -105,7 +106,13 @@ The agent lists the candidates, tells you how many look open access and how many
 and runs the batch. Open-access PDFs land in `lit-fetch-runs/<batch>/pdfs/` in your project. Papers the
 library browser fetches land beside them, in `pdfs/` for a PDF and `fulltext/` for saved page text. Saved
 text is checked for a references section: a page saved before the publisher loaded the article body is
-flagged in the manifest rather than counted as the paper. On the first library page load Claude Code asks
+flagged in the manifest rather than counted as the paper. Every file is also checked against the paper it
+was fetched for: the title of record (or the part before a colon) and the first author's surname must
+be on its first pages. An open copy that fails is dropped and the next one tried, so a mislabelled
+copy on a preprint server is not taken for the paper. PDFs are read with `pdftotext` when it is
+installed; without it, or for a scan, the agent reads the first page and records the result with
+`lfl confirm`. The plugin works from DOIs and arXiv IDs: a paper with neither, such as a NeurIPS
+paper from 2012, is outside what it fetches and files. On the first library page load Claude Code asks
 you to approve the batch. The prompt lists every site the
 logged-in browser will open, with the number of papers on each, and the page budget:
 
@@ -160,7 +167,8 @@ The plugin root is the folder Claude Code installed the plugin into (the agent k
 `lfl zotero ...`. If `zotero-cli` is not on the agent's PATH, point at it with `--zotero-cli <path>` or
 the `LFL_ZOTERO_CLI` environment variable.
 
-For each paper the batch could read, the item is added by DOI (an arXiv DOI as its arXiv page, which
+For each paper the batch could read whose file was confirmed as the paper (see Use), the item is
+added by DOI (an arXiv DOI as its arXiv page, which
 Zotero files as a preprint) into the collection
 `lit-fetch-ladder/<batch>` (unless `--collection` names another) with the tag `lit-fetch-ladder`, so one
 tag shows everything the plugin ever filed; the PDF or the saved page text is attached under a name made

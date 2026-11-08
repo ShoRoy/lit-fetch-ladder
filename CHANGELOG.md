@@ -31,6 +31,19 @@
   file failed is reported with its key and kept for the next run, which retries the file on that item.
   Uploads may take up to 300 s (`ZOTERO_WEBDAV_TIMEOUT` overrides). A refresh keeps the note it wrote
   before, and refiles papers after a `--trash`. A dry run leaves the manifest untouched.
+- Every fetched file is checked against the paper it was fetched for: the title of record (or the
+  part before a colon) and the first author's surname on its first pages, read with `pdftotext` when
+  installed. Rung 1 drops an open copy that fails and tries the next (up to three), so a copy
+  mislabelled in OpenAlex is no longer taken for the paper; `mark` records the result. A file that
+  could not be checked (no `pdftotext`, a scan) or that failed is confirmed by reading its first page
+  and running `lfl confirm`; only confirmed files are filed into Zotero. The doctor reports whether
+  `pdftotext` is found.
+- Ranking of open copies: an arXiv DOI takes arXiv's own PDF first, and a copy with no known host
+  ranks below one with a host. OpenAlex listed, for "Attention Is All You Need", files labelled
+  accepted versions on a preprint server with no source, one of them an unrelated paper; they used
+  to rank first.
+- `mark` drops the row's staging remark when a file is recorded, so it no longer reaches the Zotero
+  note, and takes `--url` for a file that came from another address than the row's landing page.
 - Staging drops a publisher's cookie-check query from the landing address (Nature's
   `?error=cookies_not_supported&code=...`), which through the proxy showed the access options instead
   of the article. `lfl mark --state OA_FETCHED --path <file>` records an open copy the browser saved

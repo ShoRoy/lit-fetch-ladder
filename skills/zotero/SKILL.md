@@ -34,9 +34,11 @@ python3 "${CLAUDE_PLUGIN_ROOT}/cli/lfl.py" zotero --batch <name> [--collection <
 It adds each paper the batch could read by DOI into the batch's collection with the tag
 `lit-fetch-ladder` (a paper already in the library is reused: it joins the collection, gets the note
 and keeps its own file), attaches the PDF or the saved page text to an item without a file, and leaves
-a note saying how the paper was obtained. A row without full text (`ABSTRACT_ONLY`) is never filed: it
-serves that round's review and nothing more. Rows the batch could not read are listed, not filed, and
-a second run files only new rows. After a `--trash`, the manifest still records the trashed filing:
+a note saying how the paper was obtained. Only a row whose file was confirmed as the paper is filed
+(`verified` in the manifest); the others are listed with the `lfl confirm` command to run once you
+have read the file's first page (the fetch skill, step 5). A row without full text (`ABSTRACT_ONLY`)
+is never filed: it serves that round's review and nothing more. Rows the batch could not read are
+listed, not filed, and a second run files only new rows. After a `--trash`, the manifest still records the trashed filing:
 file those papers again with `--refresh`. `--dry-run` prints the commands and the notes without
 running them.
 
