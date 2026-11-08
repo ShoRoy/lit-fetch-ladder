@@ -131,6 +131,9 @@ batch costs one prompt.
 
 ## File a batch into Zotero
 
+This part is optional. The plugin never touches Zotero during a fetch, and without Zotero MCP none of
+this section applies.
+
 [Zotero MCP](https://github.com/54yyyu/zotero-mcp) (`zotero-mcp-server`) adds a paper by DOI with its
 open-access PDF, and for a paywalled paper it stores the metadata and no file. This plugin fills that
 gap: once a batch has run, each paper it could read is filed into your library with what the batch
@@ -145,7 +148,8 @@ zotero-mcp setup
 Writes go to the running Zotero desktop (Zotero 10 or newer, after `zotero-mcp authorize-local` and
 **Always Allow** in the dialog Zotero shows) or through the web API (an API key and your library ID,
 any Zotero version; `zotero-mcp setup` asks for them). `/lit-fetch-ladder:doctor` reports whether
-`zotero-cli` is found. Then, after a batch, ask the agent to file it, or run it yourself:
+`zotero-cli` is found. Then, after a batch, run `/lit-fetch-ladder:zotero <batch>` (or ask the agent to
+file it), or run it yourself:
 
 ```
 python3 <plugin root>/cli/lfl.py zotero --batch survey [--collection "Reading list"] [--dry-run]
@@ -180,7 +184,7 @@ key, and the next run retries the file on that same item.
 
 If you sync files over WebDAV and your Zotero Storage quota is full, zotero-mcp up to 0.15.2 still
 uploads each file to Zotero Storage first and Zotero refuses it; the run then stops at the first refused
-file and says so. A fix that writes to WebDAV directly is proposed upstream.
+file and says so. A fix that writes to WebDAV directly is being prepared for zotero-mcp.
 
 The other way round, `zotero-cli coverage` lists the items in your library that have no PDF, with
 their DOIs. Give those DOIs to `/lit-fetch-ladder:fetch` and file the batch back.

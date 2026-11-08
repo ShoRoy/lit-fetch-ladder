@@ -467,7 +467,7 @@ test('every command the skills tell the agent to run passes the guard', () => {
     // guard would refuse the command, since it names a proxied address.
     'user_config.proxy_suffix': `https://login.${SUFFIX}/login?url=https://www.example.com/`,
   };
-  for (const skill of ['fetch', 'doctor', 'sites']) {
+  for (const skill of ['fetch', 'doctor', 'sites', 'zotero']) {
     const md = fs.readFileSync(path.join(root, 'skills', skill, 'SKILL.md'), 'utf8');
     const blocks = [...md.matchAll(/```\n([\s\S]*?)```/g)].map((m) => m[1].replace(/\\\n\s*/g, ' ').trim());
     assert.ok(blocks.length > 0, skill);

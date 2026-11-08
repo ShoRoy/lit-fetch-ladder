@@ -8,8 +8,9 @@
   batch, the date, how the paper was obtained and the file's hash, titled after the batch. A row without
   full text (`ABSTRACT_ONLY`) is never filed: it serves that round's review and nothing more. Rows the
   batch could not read are listed, not filed; the manifest records each filing,
-  so a re-run files only new rows. `--dry-run` prints the commands. The fetch skill offers it after a
-  batch when `zotero-cli` is found, and the doctor reports whether it is.
+  so a re-run files only new rows. `--dry-run` prints the commands. Filing is opt-in: it has its own
+  skill, `/lit-fetch-ladder:zotero`, which runs only when the user asks; a fetch never touches Zotero.
+  The doctor reports whether `zotero-cli` is found.
 - Filing protocol: everything filed carries the tag `lit-fetch-ladder` and lands in
   `lit-fetch-ladder/<batch>`; a paper already in the library joins the collection and gets the note but
   keeps its own file, so nothing of the user's is duplicated or replaced. A full Zotero Storage quota

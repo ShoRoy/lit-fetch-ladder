@@ -1,6 +1,6 @@
 ---
 name: fetch
-description: Fetch research papers for a literature review. Discovers papers by topic or by a paper's references, resolves DOIs and titles, downloads open-access copies, and reaches the rest through a headless browser or the user's library login, recording every request in a manifest. Use when asked to fetch, get or download papers, gather the literature on a topic, chase a paper's references, build a reading list, or file a fetched batch into Zotero.
+description: Fetch research papers for a literature review. Discovers papers by topic or by a paper's references, resolves DOIs and titles, downloads open-access copies, and reaches the rest through a headless browser or the user's library login, recording every request in a manifest. Use when asked to fetch, get or download papers, gather the literature on a topic, chase a paper's references, or build a reading list.
 argument-hint: "<doi | title | topic> [more DOIs...] [--refs-of DOI] [--batch NAME]"
 ---
 
@@ -49,15 +49,9 @@ on the command line.
    through such a link, mark the paper and tell the user.
 6. **Never guess a PDF URL.** An unverified guess becomes a fabricated citation.
 7. **Personal research use.** No bulk harvesting, no looping over long DOI lists, nothing re-hosted.
-8. **Zotero: add, attach and annotate only.** Never run `zotero-cli delete`, `duplicates merge`,
-   `batch`, `edit`, `tags --remove`, `library switch`, or an `update`, `delete` or `manage` under
-   `notes`, `annotations` or `collections`, nor Zotero MCP's delete, merge, update, set, batch-update,
-   switch-library or authorize-local-writes tools, as part of a fetch; the guard asks before them. Never
-   set `ZOTERO_*` variables on a command line, never run `zotero-mcp setup` or `authorize-local`, and
-   never run Python against the plugin's or zotero-mcp's modules: each asks too. The user's personal
-   library only. To undo a filing that went wrong, run
-   `python3 "${CLAUDE_PLUGIN_ROOT}/cli/lfl.py" zotero --trash <KEY...>` once with the user's list of
-   item keys: the guard asks once for the whole list, and Zotero's trash is recoverable.
+8. **Zotero is not part of a fetch.** Never run `zotero-cli` or Zotero MCP's tools during a fetch.
+   Filing a batch into Zotero is optional and belongs to the `zotero` skill, used only when the user
+   asks for it.
 
 ## Procedure
 
@@ -113,27 +107,8 @@ on the command line.
 5. **Report.** From `lfl show --batch <name>`: a table (title, year, how it was obtained, file, DOI)
    and the list of papers the batch could not get, each with its state. Point out any paper that came
    from a bare title so the user can check it is the right one, and any row carrying a `warning`.
-6. **File into Zotero**, when `zotero-cli` is on PATH (it ships with Zotero MCP; the doctor reports
-   whether it is found). Offer it after the report, or run it when asked to file a batch:
-
-   ```
-   python3 "${CLAUDE_PLUGIN_ROOT}/cli/lfl.py" zotero --batch <name> [--collection <key, name or parent/child>]
-   ```
-
-   It adds each paper the batch could read by DOI into the batch's collection with the tag
-   `lit-fetch-ladder` (a paper already in the library is reused: it joins the collection, gets the
-   note and keeps its own file), attaches the PDF or the saved page text to an item without a file,
-   and leaves a note saying how the paper was obtained. A row without full text (`ABSTRACT_ONLY`) is
-   never filed: it serves this round's review and nothing more. Rows the batch could not read are
-   listed, not filed, and a second run files only new rows. After a `--trash`, the manifest still
-   records the trashed filing: file those papers again with `--refresh`.
-   Report its output. If it answers that zotero-cli has no way to write to the library, or that the
-   Zotero Storage quota is full, relay its message, which names the fix (`zotero-mcp authorize-local`
-   on Zotero 10 or newer, web API credentials, freed quota), and stop: never run the authorisation
-   yourself, never retry row by row. Without `zotero-cli` but with Zotero MCP's tools present,
-   do the same by hand from `--dry-run`, which lists the rows and the note text: `zotero_add_item`
-   (`if_exists: "file"`, `attach_mode: "none"`, the collection), then `zotero_attach_file` for the
-   row's file, then `zotero_manage_note` (`action: "create"`) for the note.
+6. **Zotero (optional).** Only if the user asks to file the batch into Zotero, hand over to the
+   `zotero` skill (`/lit-fetch-ladder:zotero <batch>`). Do not offer it unprompted.
 
 ## When something stops
 
@@ -141,6 +116,3 @@ on the command line.
   approval; never work around a denial.
 - **Expired login:** pause, ask for `/lit-fetch-ladder:login`, then resume the same row.
 - **Network or resolver errors:** rows end as `ERROR` and are retried by re-running the same `fetch`.
-- **zotero-cli cannot write to the library, or Zotero Storage is full:** the run stops at the first
-  such answer; relay its message, which names the fix, and stop. The authorisation and the quota are
-  the user's to sort out.
