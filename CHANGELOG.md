@@ -6,6 +6,10 @@
   for the WebDAV settings and keeps them on a re-run (zotero-mcp #806 and #820, which came out of this
   plugin's filing runs). The README and the message for a full Zotero Storage quota now name the
   version to use.
+- Guard: two Zotero MCP tools added in zotero-mcp 0.16 and 0.17 now ask before they run:
+  `zotero_manage_collection` when it updates or deletes a collection (a delete is permanent; a create
+  passes, as filing may need one) and `zotero_copy_items_between_libraries`. The hook's matcher changed,
+  so restart Claude Code after updating.
 - README: the browser without a login opens any http(s) address without asking; what the guard hook
   costs per tool call; and that it refuses a shell command naming the sign-in script or the proxy's
   domain.

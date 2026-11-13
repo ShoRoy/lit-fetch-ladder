@@ -615,6 +615,20 @@ test('Zotero MCP tools that trash, merge, edit or switch the library ask; adding
   for (const action of ['update', 'Delete', 'DELETE', undefined]) {  // only a create passes; an overwrite asks like the CLI's notes update
     assert.equal(run(sb, pre('mcp__zotero__zotero_manage_note', { action, item_key: 'N' })).decision, 'ask', String(action));
   }
+  // zotero-mcp 0.16 folds the collection tools into one; its delete is permanent. Only a create passes.
+  assert.equal(run(sb, pre('mcp__zotero__zotero_manage_collection', { action: 'create', name: 'Reading list' })).decision, 'none');
+  for (const action of ['update', 'delete', 'Delete', undefined]) {
+    assert.equal(run(sb, pre('mcp__zotero__zotero_manage_collection', { action, collection_key: 'C' })).decision, 'ask', String(action));
+  }
+  // zotero-mcp 0.17 can copy items into another library, which filing never does
+  const copy = run(sb, pre('mcp__zotero__zotero_copy_items_between_libraries', { item_keys: ['A'], target_library_id: 1 }));
+  assert.equal(copy.decision, 'ask');
+  assert.match(copy.reason, /another library/);
+  // Claude Code calls the guard only for tools the hook's matcher names
+  const matcher = new RegExp(`^(?:${JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'hooks', 'hooks.json'), 'utf8')).hooks.PreToolUse[0].matcher})$`);
+  for (const tool of ['manage_collection', 'copy_items_between_libraries', 'manage_note', 'delete_item']) {
+    assert.match(`mcp__zotero__zotero_${tool}`, matcher, tool);
+  }
   assert.equal(run(sb, pre('mcp__zotero__zotero_add_item', { source: '10.1/x', if_exists: 'file' })).decision, 'none');
   assert.equal(run(sb, pre('mcp__zotero__zotero_attach_file', { item_key: 'A', file_path: '/x.pdf' })).decision, 'none');
   // adding or attaching the saved login or the guard state is refused, under any spelling of the path

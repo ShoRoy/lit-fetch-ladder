@@ -447,7 +447,7 @@ const ZOTERO_CODE_RE = /\b(?:from|import)\s+(?:zotero_mcp|lit_fetch_ladder)\b|\b
 // changes no destination, so setting it does not ask.
 const ZOTERO_ENV_RE = /\bZOTERO_(?:API_KEY|LIBRARY_ID|LIBRARY_TYPE|LOCAL(?:_API_KEY)?|WEBDAV_(?!TIMEOUT=)\w+)=/i;
 const ZOTERO_MCP_CMD_RE = /\bzotero-mcp\s+(?:setup|authorize-local)\b/i;
-const ZOTERO_MCP_RE = /^mcp__.+__zotero_(delete_item|delete_collection|delete_annotation|merge_duplicates|batch_update|switch_library|manage_note|update_item|set_item_collections|set_item_parent|update_collection|update_annotation|remove_item_relation|authorize_local_writes|attach_file|add_item)$/;
+const ZOTERO_MCP_RE = /^mcp__.+__zotero_(delete_item|delete_collection|delete_annotation|merge_duplicates|batch_update|switch_library|manage_note|update_item|set_item_collections|set_item_parent|update_collection|update_annotation|remove_item_relation|authorize_local_writes|attach_file|add_item|manage_collection|copy_items_between_libraries)$/;
 const ZOTERO_ASK = 'can trash, merge, edit or switch your Zotero library, or authorise local writes to it; filing a fetched batch never needs it. Confirm it is part of what you asked for.';
 const SECRET_DENY = 'the saved library login and the guard state are not readable by the agent.';
 
@@ -483,7 +483,9 @@ function judgeZotero(cfg, tool, input) {
     }
     return null;
   }
-  if (m[1] === 'manage_note' && String(input.action || '').trim().toLowerCase() === 'create') return null;
+  // A new note or collection is what filing adds; an update or a delete asks.
+  if ((m[1] === 'manage_note' || m[1] === 'manage_collection') && String(input.action || '').trim().toLowerCase() === 'create') return null;
+  if (m[1] === 'copy_items_between_libraries') return out('ask', `"${tool}" copies items into another library; filing a fetched batch never needs it. Confirm it is part of what you asked for.`);
   return out('ask', `"${tool}" ${ZOTERO_ASK}`);
 }
 
