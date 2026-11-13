@@ -35,9 +35,9 @@ KEY_RE = re.compile(r"Item key: `([A-Z0-9]{8})`")
 ARXIV_DOI = re.compile(r"^10\.48550/arxiv\.(.+)$", re.IGNORECASE)
 EXISTING = "Already in library"
 NO_WRITE_PATH = "Cannot perform write operations"
-# Zotero's answer when an upload would overflow the account's Zotero Storage quota. zotero-mcp
-# up to 0.15.2 uploads to Zotero Storage first even when WebDAV is configured, so the refusal
-# would repeat for every file in the run.
+# Zotero's answer when an upload would overflow the account's Zotero Storage quota. The refusal
+# would repeat for every file in the run, so the run stops. zotero-mcp before 0.16.0 uploads to
+# Zotero Storage first even when WebDAV is configured.
 QUOTA_FULL = "exceed quota"
 
 
@@ -303,11 +303,11 @@ def file_batch(batch, base, cli="zotero-cli", collection=None, refresh=False, dr
                 return lines, filed, False
             if QUOTA_FULL in msg:
                 fetch.write_json(mpath, manifest)
-                lines.append("\nZotero refused the file: the account's Zotero Storage quota is full. zotero-mcp "
-                             "up to 0.15.2 uploads to Zotero Storage first even when WebDAV is configured, so "
-                             "every file in this run would be refused. Free quota, use local mode or a zotero-mcp "
-                             "with the WebDAV-first attach, then rerun: rows already filed are kept. Zotero's "
-                             "message:\n%s" % msg)
+                lines.append("\nZotero refused the file: the account's Zotero Storage quota is full, so every "
+                             "file in this run would be refused. Free quota, or send the files elsewhere: local "
+                             "mode, or WebDAV with zotero-mcp 0.16.0 or later (earlier versions upload to Zotero "
+                             "Storage first even when WebDAV is configured). Then rerun: rows already filed are "
+                             "kept. Zotero's message:\n%s" % msg)
                 return lines, filed, False
             where = ("" if not key else " [your item %s; the next run retries]" % key if existing
                      else " [item %s was added; the next run retries its file, or --trash %s removes it]" % (key, key))

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- zotero-mcp 0.16.0 writes attached files to WebDAV directly, and from 0.17.1 `zotero-mcp setup` asks
+  for the WebDAV settings and keeps them on a re-run (zotero-mcp #806 and #820, which came out of this
+  plugin's filing runs). The README and the message for a full Zotero Storage quota now name the
+  version to use.
+- README: the browser without a login opens any http(s) address without asking; what the guard hook
+  costs per tool call; and that it refuses a shell command naming the sign-in script or the proxy's
+  domain.
+
 ## 0.2.0
 
 - `lfl zotero --batch <name>` files a finished batch into Zotero through `zotero-cli` (it ships with

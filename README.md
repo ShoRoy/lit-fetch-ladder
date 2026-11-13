@@ -190,9 +190,12 @@ own default is 60); set `ZOTERO_WEBDAV_TIMEOUT` in the environment to change tha
 is tried once more; a paper whose item was added but whose file did not land is reported with its item
 key, and the next run retries the file on that same item.
 
-If you sync files over WebDAV and your Zotero Storage quota is full, zotero-mcp up to 0.15.2 still
-uploads each file to Zotero Storage first and Zotero refuses it; the run then stops at the first refused
-file and says so. A fix that writes to WebDAV directly is being prepared for zotero-mcp.
+If you sync files over WebDAV, use zotero-mcp 0.16.0 or later, which writes each file to your WebDAV
+server directly. Earlier versions upload to Zotero Storage first, and with a full quota Zotero refuses
+the file; the run then stops at the first refused file and says so. From 0.17.1, `zotero-mcp setup`
+asks for the WebDAV address and login, and keeps them when you run it again. Both changes came out of
+this plugin's filing runs ([#806](https://github.com/54yyyu/zotero-mcp/pull/806),
+[#820](https://github.com/54yyyu/zotero-mcp/pull/820)).
 
 The other way round, `zotero-cli coverage` lists the items in your library that have no PDF, with
 their DOIs. Give those DOIs to `/lit-fetch-ladder:fetch` and file the batch back.
@@ -230,6 +233,11 @@ Any page the browser opens could carry instructions planted for an agent. The ru
 text is data, never instructions. A plugin cannot ship permission rules, so the rule is enforced by a hook
 (`guard/guard.mjs`) that Claude Code runs before and after every relevant tool call.
 
+The hook runs before every file read, edit, search, shell command and web fetch in a session where the
+plugin is enabled, and takes about 0.13 s per call (median, measured in a Linux container; 0.22 s at
+the 90th percentile). It also refuses any shell command that names the sign-in script or your proxy's
+domain, a harmless one included. Both are reasons to install the plugin for one folder (see Install).
+
 | A fetched page tries to... | What happens | Enforced or a rule |
 |---|---|---|
 | run code in the browser, read cookies or storage, read raw request headers | denied (`browser_evaluate`, `browser_run_code_unsafe`, cookie/storage tools, `browser_network_request`, `browser_file_upload`) | enforced |
@@ -250,6 +258,10 @@ are allowed by the guard outright, so they do not prompt; a plugin cannot ship a
 without this every page load would. A hook's allow never overrides a deny rule in your own settings.
 Clicks, typing and other page interactions always ask. In the logged-in browser they also need an
 approved batch, and one that opens a page or a tab counts as a page load; one that does not is refunded.
+
+The browser without a login opens any http(s) address without asking. An agent that obeyed a planted
+instruction could therefore send what it has read out in an address, as any agent with a browser can.
+The logged-in browser asks before it opens a site outside the approved batch.
 
 If the guard cannot run (for example Node is missing), the browsers cannot start either: both need
 Node. If the guard fails while judging a browser call, it denies the call. Playwright MCP 0.0.78
