@@ -128,4 +128,7 @@ on the command line.
 - **Guard denial or cap reached:** report progress and stop. A new or larger batch needs the user's
   approval; never work around a denial.
 - **Expired login:** pause, ask for `/lit-fetch-ladder:login`, then resume the same row.
+- **Bot check or captcha** ("Are you a robot?" and the like) on a publisher's page: stop on that paper.
+  Never click through it, solve it, retry it or look for another route to it. Leave the row staged and
+  tell the user, who can open the paper through their library.
 - **Network or resolver errors:** rows end as `ERROR` and are retried by re-running the same `fetch`.
