@@ -16,13 +16,13 @@ THEMES = {
         "text": "#1f2328", "muted": "#59636e", "line": "#8c959f",
         "ladder": "#b45309", "box": "#f6f8fa", "box_edge": "#d0d7de",
         "guard": "#ddf4ff", "guard_edge": "#54aeff", "guard_text": "#0550ae",
-        "zotero": "#cc2936",
+        "zotero": "#cc2936", "zlogo_line": "#1a1a1a", "zlogo_z": "#cc2936",
     },
     "dark": {
         "text": "#e6edf3", "muted": "#9198a1", "line": "#6e7681",
         "ladder": "#f59e0b", "box": "#161b22", "box_edge": "#30363d",
         "guard": "#0c2d48", "guard_edge": "#1f6feb", "guard_text": "#79c0ff",
-        "zotero": "#ff6b6b",
+        "zotero": "#ff6b6b", "zlogo_line": "#e6e8eb", "zlogo_z": "#ff7b86",
     },
 }
 
@@ -54,6 +54,15 @@ def box(x, y, w, h, t, title, sub, dashed=False, edge=None):
     for i, line in enumerate(sub):
         out.append(text(cx, y + 40 + 16 * i, line, t["muted"], 12, anchor="middle"))
     return out
+
+
+def zotero_mcp_logo(t, x, y, size):
+    """Zotero MCP's logo (github.com/54yyyu/zotero-mcp, docs/assets/logo-*.svg, MIT), drawn at (x, y)."""
+    return (f'<g transform="translate({x} {y}) scale({size / 128:.4f})"><g transform="translate(4 9) scale(.94)" '
+            'fill="none" stroke-linejoin="round" stroke-linecap="round">'
+            '<path d="M40 12H88a26 26 0 0 1 26 26V78a26 26 0 0 1-26 26H62L38 118V104H40a26 26 0 0 1-26-26V38'
+            f'a26 26 0 0 1 26-26Z" stroke="{t["zlogo_line"]}" stroke-width="5.5"/>'
+            f'<path d="M47 39H81L47 77H81" stroke="{t["zlogo_z"]}" stroke-width="8"/></g></g>')
 
 
 def pipeline(t):
@@ -130,6 +139,7 @@ def pipeline(t):
     o += box(858, 312, 192, 108, t, "Zotero MCP",
              ["separate project", "your library: search, read,", "cite and annotate", "from any agent"],
              dashed=True, edge=t["zotero"])
+    o.append(zotero_mcp_logo(t, 876, 316, 22))
     o.append("</svg>")
     return "\n".join(o) + "\n"
 

@@ -57,4 +57,5 @@
 <text x="954.0" y="368" fill="#9198a1" font-size="12" font-weight="normal" font-style="normal" text-anchor="middle">your library: search, read,</text>
 <text x="954.0" y="384" fill="#9198a1" font-size="12" font-weight="normal" font-style="normal" text-anchor="middle">cite and annotate</text>
 <text x="954.0" y="400" fill="#9198a1" font-size="12" font-weight="normal" font-style="normal" text-anchor="middle">from any agent</text>
+<g transform="translate(876 316) scale(0.1719)"><g transform="translate(4 9) scale(.94)" fill="none" stroke-linejoin="round" stroke-linecap="round"><path d="M40 12H88a26 26 0 0 1 26 26V78a26 26 0 0 1-26 26H62L38 118V104H40a26 26 0 0 1-26-26V38a26 26 0 0 1 26-26Z" stroke="#e6e8eb" stroke-width="5.5"/><path d="M47 39H81L47 77H81" stroke="#ff7b86" stroke-width="8"/></g></g>
 </svg>
