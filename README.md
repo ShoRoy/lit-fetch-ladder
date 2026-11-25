@@ -73,10 +73,9 @@ sandbox. [Safeguards](docs/safeguards.md) says what it covers and what it does n
 
 [Zotero MCP](https://github.com/54yyyu/zotero-mcp) is a separate project that puts your Zotero library
 in any AI agent, to search, read, cite and annotate. lit-fetch-ladder covers what comes before the
-library. A finished batch is filed through `zotero-cli`, which ships with Zotero MCP, and from there
-Zotero MCP takes over. The plugin's part ends at filing, where it adds items, attaches files and writes
-a note. Filing is optional, and without Zotero MCP the plugin fetches as usual. See
-[Filing into Zotero](docs/zotero.md).
+library. It files a finished batch through `zotero-cli`, which ships with Zotero MCP, by adding items,
+attaching files and writing a note, and its part ends there. Filing is optional, and without Zotero MCP
+the plugin fetches as usual. See [Filing into Zotero](docs/zotero.md).
 
 ## Quick start
 
@@ -148,8 +147,10 @@ the article behind the plugin, with the runs and the threat model. Changes: [CHA
 
 ## Contributing
 
-Issues and pull requests are welcome ([CONTRIBUTING.md](CONTRIBUTING.md)). Report a way past the guard
-privately, as described in [SECURITY.md](SECURITY.md).
+Open an issue to report a problem or to suggest a fix. Because the guard and the library login are
+security-sensitive, the author makes every change, and pull requests are not accepted
+([CONTRIBUTING.md](CONTRIBUTING.md)). Report a way past the guard privately, as described in
+[SECURITY.md](SECURITY.md).
 
 ## License
 

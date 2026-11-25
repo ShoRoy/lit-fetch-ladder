@@ -43,3 +43,8 @@ body:
     attributes:
       label: Versions
       description: Plugin version, Claude Code version, operating system.
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea for a fix (optional)
+      description: For example, a redirect the guard should know about. Pull requests are not accepted, so describe it here.

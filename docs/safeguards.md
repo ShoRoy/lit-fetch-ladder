@@ -42,13 +42,14 @@ plugin for one folder.
 | change your Zotero library beyond filing, through `zotero-cli`, Zotero MCP's own tools or `lfl zotero --trash` (trash, merge, edit, delete a collection, copy items to or switch libraries, set Zotero credentials or the target library on a command line, run code against the Zotero modules, run `zotero-mcp setup` or `authorize-local`) | you are asked, once per command, and once for the whole list with `lfl zotero --trash`; filing only adds, attaches and annotates |
 
 In the browser without a login, page loads, snapshots, screenshots, waits and clicks run without a
-prompt. In the library browser, page loads run without a prompt only inside an approved batch. Clicks
-there run without a prompt only inside an approved batch, on a page of a site the batch approved, and
-only where clicks run without asking: a site shipped in `guard/known-sites.json`, or one where you
-approved a click before. Every other click, typing and other page interactions ask. In the library
-browser all of them need an approved batch, and one that opens a page or a tab counts as a page load. `tests/redteam/` replays what an agent might try after reading a
-page with planted instructions (`tests/redteam/injected-page.html`), checks each of the guard's
-decisions, and runs with the other tests.
+prompt. In the library browser, page loads and page interactions need an approved batch. Page loads
+inside it run without a prompt, and so do clicks on a page of a site the batch approved, where that
+site is shipped in `guard/known-sites.json` or you approved a click there before. Other clicks, typing
+and other interactions ask. Any of them that opens a page or a tab counts as a page load.
+
+`tests/redteam/` replays what an agent might try after reading a page with planted instructions
+(`tests/redteam/injected-page.html`), checks each of the guard's decisions, and runs with the other
+tests.
 
 ## What the guard does not cover
 

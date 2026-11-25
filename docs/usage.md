@@ -97,9 +97,9 @@ policy's location on macOS and Windows has not been checked.
 
 Some publishers put a bot check ("Are you a robot?") in front of their article or file servers, and it
 can come and go from day to day. The fetch skill tells the agent to stop at it and not try to get past
-it. The paper stays staged, and you can open it yourself through your library. Do not retry it in a loop, because repeated attempts are what bot
-checks and library proxies watch for. A report through the "publisher does not download" issue form
-helps the docs say which sites do this.
+it. The paper stays staged, and you can open it yourself through your library. Do not retry it in a
+loop, because repeated attempts are what bot checks and library proxies watch for. A report through the
+"publisher does not download" issue form helps the docs say which sites do this.
 
 Each library pays for its own set of journals. A paper your library does not cover shows a purchase or
 "get access" page, and the agent marks it `ABSTRACT_ONLY` with a note.

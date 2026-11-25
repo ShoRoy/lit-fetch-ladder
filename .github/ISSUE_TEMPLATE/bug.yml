@@ -32,3 +32,8 @@ body:
       description: Plugin version, Claude Code version (claude --version), operating system, and zotero-mcp-server version if the problem is in filing.
     validations:
       required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea for a fix (optional)
+      description: Pull requests are not accepted, so describe the change you have in mind and the author will make it.
