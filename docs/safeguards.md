@@ -5,9 +5,10 @@ To report a way past the guard, see [`SECURITY.md`](../SECURITY.md).
 
 ## The threat
 
-Any page the browser opens could carry instructions planted for an agent. The risky moment is an agent
-reading such a page while it controls a browser signed in as you. A planted line could ask it to
-download many papers through your library's proxy, read the saved login, or open other sites with it.
+Any page the browser opens could carry instructions planted for an agent (prompt injection). The risky
+moment is an agent reading such a page while it controls a browser signed in as you. A planted line
+could ask it to download many papers through your library's proxy, read the saved login, or open other
+sites with it.
 
 The fetch skill tells the agent to treat fetched text as data, never as instructions. An agent can still
 follow a planted line, so a hook (`guard/guard.mjs`), which Claude Code runs before and after each

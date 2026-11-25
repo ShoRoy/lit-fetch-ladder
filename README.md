@@ -51,12 +51,25 @@ Rungs 2 and 3 use [Microsoft's Playwright MCP server](https://github.com/microso
 pinned to `@playwright/mcp@0.0.78`, and this plugin adds the configuration, the batch driver and the
 guard around it. Rungs 0 and 1 also run [without Claude Code](docs/usage.md#without-claude-code).
 
-Giving an agent a browser signed in as you is the risky part. A guard written as Claude Code hooks asks
-you to approve each library batch, caps its page loads, refuses file reads of the saved login and shell
-commands that name it, and refuses code in either browser. The guard enforces rules but is not a
-sandbox, and [Safeguards](docs/safeguards.md#what-the-guard-does-not-cover) lists what it does not cover.
+## A guard against prompt injection
 
-## Works with Zotero MCP
+Any page the agent reads can carry instructions planted for it, and here the agent reads pages while it
+controls a browser signed in as you. The fetch skill tells the agent to treat fetched text as data. A
+guard written as Claude Code hooks checks each tool call before it runs, and limits what the agent can do
+if it follows a planted line anyway.
+
+- The library browser opens only the papers of a batch you approved, on the sites its approval prompt
+  lists, within a page budget and a per-burst and daily cap.
+- Neither browser can run code, read cookies or storage, or read a request's raw headers.
+- The agent's file tools cannot read the saved login, and shell commands that name it are refused.
+- A page load or click that starts a bulk download stops the batch.
+- Changes to your Zotero library beyond filing ask you first.
+
+A red-team replay in `tests/redteam/` feeds the guard what an agent might try after reading a page with
+planted instructions and checks each decision, on every push. The guard enforces rules but is not a
+sandbox. [Safeguards](docs/safeguards.md) says what it covers and what it does not.
+
+## <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/54yyyu/zotero-mcp/v0.17.3/docs/assets/logo-dark.svg"><img src="https://raw.githubusercontent.com/54yyyu/zotero-mcp/v0.17.3/docs/assets/logo-light.svg" width="26" height="26" alt="Zotero MCP logo"></picture> Works with Zotero MCP
 
 [Zotero MCP](https://github.com/54yyyu/zotero-mcp) is a separate project that puts your Zotero library
 in any AI agent, to search, read, cite and annotate. lit-fetch-ladder covers what comes before the
