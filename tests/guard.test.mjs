@@ -81,11 +81,12 @@ test('code execution, storage and raw-network tools are denied', () => {
   }
 });
 
-test('interaction tools ask; unknown tools ask', () => {
+test('interaction tools ask, except a click in the browser without a login; unknown tools ask', () => {
   const sb = sandbox();
-  for (const t of ['click', 'type', 'fill_form', 'press_key', 'handle_dialog']) {
+  for (const t of ['type', 'fill_form', 'press_key', 'handle_dialog', 'select_option']) {
     assert.equal(run(sb, pre(`${P}browse__browser_${t}`)).decision, 'ask', t);
   }
+  assert.equal(run(sb, pre(`${P}browse__browser_click`, { target: 'e1' })).decision, 'allow');
   assert.equal(run(sb, pre(`${P}browse__browser_brand_new_tool`)).decision, 'ask');
 });
 
@@ -277,12 +278,12 @@ test('pageState reads the address and the tab count from a Playwright MCP 0.0.78
   assert.deepEqual(pageState([{ type: 'text', text: 'Error: timed out' }]), { url: null, tabs: 0 });
 });
 
-test('a click in the logged-in browser needs an approved batch; in the plain browser it only asks', () => {
+test('a click in the logged-in browser needs an approved batch; in the browser without a login it runs', () => {
   const sb = sandbox();
   const r = run(sb, libClick('e1'));
   assert.equal(r.decision, 'deny');
   assert.match(r.reason, /no batch is approved/);
-  assert.equal(run(sb, pre(`${P}browse__browser_click`, { target: 'e1' })).decision, 'ask');
+  assert.equal(run(sb, pre(`${P}browse__browser_click`, { target: 'e1' })).decision, 'allow');
   approve(sb);
   const asked = run(sb, libClick('e1'));
   assert.equal(asked.decision, 'ask');
@@ -295,7 +296,7 @@ test('a click that opens a page counts as a page load; one that does not is refu
   approve(sb, mcpPage(a));                                  // load 1; the browser is on a
   assert.equal(run(sb, libClick('e1')).decision, 'ask');   // reserves load 2
   run(sb, libClickDone('e1', mcpPage(`${a}#refs`)));       // same page (a fragment): refunded
-  assert.equal(run(sb, libClick('e2')).decision, 'ask');   // reserves load 2 again
+  assert.equal(run(sb, libClick('e2')).decision, 'allow'); // the approved click taught the site; reserves load 2 again
   run(sb, libClickDone('e2', mcpPage(libUrl('www-examplepub-com', '/doi/epdf/10.1/a'))));  // a new page: it stands
   const u = libUrl('www-examplepub-com');
   assert.equal(run(sb, libNav(u)).decision, 'allow');      // 3
@@ -539,6 +540,116 @@ test('the sites skill lists and forgets companions, and a forgotten one asks aga
   assert.match(sitesCmd(sb, 'list'), /No remembered companion sites/);
   writeManifest(sb.manifest, ['p'], 'b2');
   assert.doesNotMatch(run(sb, libNav(libUrl('www-examplepub-com', '/doi/10.1/p'))).reason, /Also allowed/);
+});
+
+// ---------------------------------------------------------------- shipped sites, click trust, bulk downloads
+
+// A batch staged at Elsevier's link site, as the batch driver stages 10.1016 DOIs.
+function elsevierBatch(sb, ids = ['x', 'y']) {
+  const items = ids.map((id) => ({ doi: `10.1016/${id}`, state: 'NEEDS_AUTH', auth_url: libUrl('linkinghub-elsevier-com', `/retrieve/pii/${id}`) }));
+  fs.writeFileSync(sb.manifest, JSON.stringify({ batch: 'els', items }));
+  return items;
+}
+// A Playwright MCP result on `url` whose call started downloading `files`.
+const started = (url, files, extra = []) => [{ type: 'text', text: ['### Page', `- Page URL: ${url}`, '### Events', ...extra,
+  ...files.map((f) => `- Downloading file ${f} ...`)].join('\n') }];
+
+test('known publisher redirects are listed in the batch prompt and then pass without asking', () => {
+  const sb = sandbox({ opts: { pages_per_paper: 8 } });
+  const [x] = elsevierBatch(sb);
+  const r = run(sb, libNav(x.auth_url));
+  assert.equal(r.decision, 'ask');
+  assert.match(r.reason, /Also allowed, as known redirects of these publishers: sciencedirect\.com \(follows elsevier\.com\), sciencedirectassets\.com \(follows sciencedirect\.com\)/);
+  assert.doesNotMatch(r.reason, /from your earlier approvals/);
+  run(sb, post(`${P}library__browser_navigate`, { url: x.auth_url }, mcpPage(libUrl('www-sciencedirect-com', '/science/article/pii/x'))));
+  assert.equal(run(sb, libNav(libUrl('www-sciencedirect-com', '/science/article/pii/x/pdfft'))).decision, 'allow');
+  assert.equal(run(sb, libNav('https://pdf.sciencedirectassets.com/1/main.pdf')).decision, 'allow');
+  assert.equal(run(sb, libNav(libUrl('www-other-example', '/x'))).decision, 'ask');  // a site no list names still asks
+});
+
+test('a known redirect does not apply to a batch without the site it follows', () => {
+  const sb = sandbox();
+  const a = libUrl('www-examplepub-com', '/doi/10.1/a');
+  assert.doesNotMatch(run(sb, libNav(a)).reason, /known redirects/);
+  run(sb, post(`${P}library__browser_navigate`, { url: a }, mcpPage(a)));
+  assert.equal(run(sb, libNav(libUrl('www-sciencedirect-com', '/x'))).decision, 'ask');
+});
+
+test('a click on a shipped click site inside an approved batch runs, and still counts', () => {
+  const sb = sandbox();  // 2 papers x 2 pages = 4 loads
+  const [x] = elsevierBatch(sb);
+  const sd = libUrl('www-sciencedirect-com', '/science/article/pii/x');
+  run(sb, libNav(x.auth_url));                                                         // 1, approved below
+  run(sb, post(`${P}library__browser_navigate`, { url: x.auth_url }, mcpPage(sd)));   // the browser is on sciencedirect
+  const c = run(sb, libClick('e1'));
+  assert.equal(c.decision, 'allow');
+  assert.match(c.reason, /sciencedirect\.com, where clicks in an approved batch run without asking/);
+  run(sb, libClickDone('e1', mcpPage(`${sd}/references`)));                           // it opened a page: 2 stands
+  assert.equal(run(sb, libNav(sd)).decision, 'allow');                                // 3
+  assert.equal(run(sb, libNav(sd)).decision, 'allow');                                // 4
+  assert.match(run(sb, libNav(sd)).reason, /batch budget spent/);
+});
+
+test('a click asks on a site the batch has not approved, even a shipped click site, and teaches nothing there', () => {
+  const sb = sandbox();
+  approve(sb, mcpPage(libUrl('www-sciencedirect-com', '/x')));  // a redirect landed outside the batch
+  const r = run(sb, libClick('e1'));
+  assert.equal(r.decision, 'ask');
+  assert.doesNotMatch(r.reason, /later clicks/);
+  run(sb, libClickDone('e1', mcpPage(libUrl('www-sciencedirect-com', '/x'))));
+  assert.equal(run(sb, libClick('e2')).decision, 'ask');
+});
+
+test('an approved click teaches its site; the sites skill lists and forgets it', () => {
+  const sb = sandbox();
+  const a = libUrl('www-examplepub-com', '/doi/10.1/a');
+  approve(sb, mcpPage(a));
+  const r = run(sb, libClick('e1'));
+  assert.equal(r.decision, 'ask');
+  assert.match(r.reason, /later clicks on examplepub\.com run without asking/);
+  run(sb, libClickDone('e1', mcpPage(a)));
+  assert.equal(run(sb, libClick('e2')).decision, 'allow');
+  run(sb, libClickDone('e2', mcpPage(a)));
+  const list = sitesCmd(sb, 'list');
+  assert.match(list, /Remembered click sites[^\n]*\n\s+examplepub\.com/);
+  assert.match(list, /Built in \(guard\/known-sites\.json\): known redirects sciencedirect\.com \(follows elsevier\.com\)/);
+  assert.match(sitesCmd(sb, 'forget', 'examplepub.com'), /Forgot 1/);
+  assert.equal(run(sb, libClick('e3')).decision, 'ask');
+});
+
+test('a page load that starts several downloads stops the batch until the user approves it again', () => {
+  const sb = sandbox({ opts: { pages_per_paper: 8 } });  // 16 loads
+  const a = libUrl('www-examplepub-com', '/doi/10.1/a');
+  approve(sb, mcpPage(a));                                                             // 1
+  const pdf = libUrl('www-examplepub-com', '/doi/pdf/10.1/a');
+  assert.equal(run(sb, libNav(pdf)).decision, 'allow');                               // 2
+  // One PDF is a paper; a download finished from an earlier call is reported again and not counted.
+  const one = started(pdf, ['a.pdf'], ['- Downloaded file earlier.pdf to "/tmp/earlier.pdf"']);
+  assert.equal(run(sb, post(`${P}library__browser_navigate`, { url: pdf }, one)).decision, 'none');
+  const issue = libUrl('www-examplepub-com', '/toc/12/pdfs');
+  assert.equal(run(sb, libNav(issue)).decision, 'allow');                             // 3
+  const r = run(sb, post(`${P}library__browser_navigate`, { url: issue }, started(issue, ['a.pdf', 'b.pdf', 'c.pdf'])));
+  assert.equal(r.decision, 'message');
+  assert.match(r.reason, /stopped the batch "b1": one page load started 3 downloads \(a\.pdf, b\.pdf, c\.pdf\)/);
+  const next = run(sb, libNav(a));
+  assert.equal(next.decision, 'ask');
+  assert.match(next.reason, /batch "b1" was stopped: .* 13 of 16 page loads left/);
+  assert.equal(run(sb, libClick('e1')).decision, 'deny');                            // nothing approved while it is stopped
+  run(sb, post(`${P}library__browser_navigate`, { url: a }, mcpPage(a)));             // the user approved: it continues
+  assert.equal(run(sb, libNav(a)).decision, 'allow');
+});
+
+test('a click that starts an archive download stops the batch, and its learned click site loses its trust', () => {
+  const sb = sandbox({ opts: { pages_per_paper: 8 } });
+  const a = libUrl('www-examplepub-com', '/doi/10.1/a');
+  approve(sb, mcpPage(a));
+  run(sb, libClick('e1'));
+  run(sb, libClickDone('e1', mcpPage(a)));                                             // an approved click: examplepub.com learned
+  assert.equal(run(sb, libClick('e2')).decision, 'allow');
+  const r = run(sb, libClickDone('e2', started(a, ['issue-12.zip'])));
+  assert.match(r.reason, /one "click" started an archive download \(issue-12\.zip\)/);
+  assert.match(sitesCmd(sb, 'list'), /No remembered click sites/);
+  assert.match(run(sb, libNav(a)).reason, /was stopped/);
 });
 
 test('zotero-cli commands that trash, merge, edit or switch the library ask; filing a batch does not', () => {

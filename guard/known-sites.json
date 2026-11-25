@@ -1,0 +1,21 @@
+{
+  "about": "Publisher sites the guard knows before any approval of yours. 'follows': sites a publisher's pages are known to redirect to or serve files from; a batch that includes the site on the left lists them in its approval prompt, as it lists the sites you approved before. 'click': sites where, inside an approved batch, a click in the library browser runs without asking. Add an entry only for a site seen in a real run; a wrong entry widens what one approval covers.",
+  "follows": {
+    "elsevier.com": ["sciencedirect.com"],
+    "sciencedirect.com": ["sciencedirectassets.com"]
+  },
+  "click": [
+    "acm.org",
+    "aiaa.org",
+    "aip.org",
+    "aps.org",
+    "ieee.org",
+    "nature.com",
+    "oup.com",
+    "sciencedirect.com",
+    "siam.org",
+    "springer.com",
+    "tandfonline.com",
+    "wiley.com"
+  ]
+}

@@ -64,6 +64,17 @@ asking and list it in the approval prompt ("Also allowed, from your earlier appr
 approval in a prompt adds one. `/lit-fetch-ladder:sites` lists and forgets them. After the first batch
 from a publisher, a batch usually costs one prompt.
 
+The plugin also ships a short list of sites that publishers are known to redirect to, in
+`guard/known-sites.json`, for example sciencedirect.com for Elsevier's link site. A batch that includes
+the publisher lists them in its prompt as known redirects, so the one approval covers them.
+
+The agent opens a PDF link by navigating to its address where the page gives one, so it rarely needs to
+click. A click in the library browser asks you, except on a site where clicks run without asking: one in
+the shipped list (publishers seen in real runs) or one where you approved a click before. Even there a
+click runs only inside an approved batch, on a site the batch approved, and counts as a page load when
+it opens a page. If one page load or click starts more than one download, or an archive, the guard
+stops the batch and tells you. The next page load then asks you again and gives the reason.
+
 ## PDFs that open in a viewer
 
 Some publishers, Oxford Academic, ACM and HAL among them, show a PDF in the browser's viewer instead of
@@ -86,8 +97,7 @@ policy's location on macOS and Windows has not been checked.
 
 Some publishers put a bot check ("Are you a robot?") in front of their article or file servers, and it
 can come and go from day to day. The fetch skill tells the agent to stop at it and not try to get past
-it, and any click on the page asks you first, so decline one there. The paper stays staged, and you can
-open it yourself through your library. Do not retry it in a loop, because repeated attempts are what bot
+it. The paper stays staged, and you can open it yourself through your library. Do not retry it in a loop, because repeated attempts are what bot
 checks and library proxies watch for. A report through the "publisher does not download" issue form
 helps the docs say which sites do this.
 

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Fewer prompts in the library browser. The plugin ships `guard/known-sites.json`: sites publishers are
+  known to redirect to (Elsevier's link site to sciencedirect.com and its file host), which a batch
+  that includes the publisher lists in its one approval prompt, and sites where a click in the library
+  browser runs without asking inside an approved batch. A click you approve on a site the batch approved
+  adds that site to the click list, and `/lit-fetch-ladder:sites` lists and forgets the learned ones. A
+  click in the browser without a login no longer asks, since that browser already opens any address
+  unasked. The fetch skill navigates to a PDF link's address instead of clicking it where it can.
+- The guard stops a batch when one page load or click starts more than one download, or an archive
+  (a whole issue, for example), tells the user, and asks again at the next page load with the reason. A
+  learned click site that led to it loses its trust.
 - zotero-mcp 0.16.0 writes attached files to WebDAV directly, and from 0.17.1 `zotero-mcp setup` asks
   for the WebDAV settings and keeps them on a re-run (zotero-mcp #806 and #820, which came out of this
   plugin's filing runs). docs/zotero.md and the message for a full Zotero Storage quota now name the

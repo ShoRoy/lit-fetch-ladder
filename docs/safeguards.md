@@ -36,13 +36,16 @@ plugin for one folder.
 | reuse a site approved in an earlier batch | allowed only in batches that include the site it was approved from, and listed in their approval prompt; forget it with `/lit-fetch-ladder:sites` |
 | fetch a proxied address with `curl` or WebFetch, outside the counted browser | denied |
 | loop, by navigating or by clicking through pages | the batch's page budget, 20 page loads per burst, 60 per 24 hours; a click or key press in the library browser counts when it opens a page or a tab |
+| download a whole issue with one click or page load | the batch stops when one action starts more than one download or an archive, and the next page load asks you, with the reason |
 | make you run the sign-in, or run it itself | the sign-in starts from your `/lit-fetch-ladder:login`, which the agent cannot invoke; shell commands that name the sign-in script are refused |
 | change your Zotero library beyond filing, through `zotero-cli`, Zotero MCP's own tools or `lfl zotero --trash` (trash, merge, edit, delete a collection, copy items to or switch libraries, set Zotero credentials or the target library on a command line, run code against the Zotero modules, run `zotero-mcp setup` or `authorize-local`) | you are asked, once per command, and once for the whole list with `lfl zotero --trash`; filing only adds, attaches and annotates |
 
-In the browser without a login, page loads, snapshots, screenshots and waits run without a prompt. In the
-library browser, page loads run without a prompt only inside an approved batch. Clicks, typing and other
-page interactions always ask. In the library browser they also need an approved batch, and one that opens
-a page or a tab counts as a page load. `tests/redteam/` replays what an agent might try after reading a
+In the browser without a login, page loads, snapshots, screenshots, waits and clicks run without a
+prompt. In the library browser, page loads run without a prompt only inside an approved batch. Clicks
+there run without a prompt only inside an approved batch, on a page of a site the batch approved, and
+only where clicks run without asking: a site shipped in `guard/known-sites.json`, or one where you
+approved a click before. Every other click, typing and other page interactions ask. In the library
+browser all of them need an approved batch, and one that opens a page or a tab counts as a page load. `tests/redteam/` replays what an agent might try after reading a
 page with planted instructions (`tests/redteam/injected-page.html`), checks each of the guard's
 decisions, and runs with the other tests.
 
@@ -62,6 +65,15 @@ decisions, and runs with the other tests.
   opened with `/lit-fetch-ladder:login`.
 - A redirect inside one page load cannot be stopped. The site it lands on is not trusted, and the next
   page load there asks.
+- A click on a site where clicks run without asking is not shown to you first. The guard sees the
+  agent's description of the element, not what the click does. Such a click can take the browser to
+  another site, as a redirect can, or answer a bot check, and only the fetch skill's rules hold the
+  agent back there.
+- The bulk-download stop acts after the call. The downloads that one action started are already under
+  way when the batch stops. The guard reads the downloads reported in the result of the page load or
+  click that started them.
+- The sites shipped in `guard/known-sites.json` are trusted without an earlier approval of yours. The
+  batch prompt lists the known redirects, and `/lit-fetch-ladder:sites` lists the click sites.
 - A page that loads another page by itself, with no navigation or click from the agent, is not counted.
 - More papers from a publisher already in the batch are bounded by the page budget, not prevented.
 - A site approved by mistake stays allowed in batches that include the site it follows, until you forget

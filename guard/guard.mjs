@@ -6,10 +6,15 @@
 // What it enforces:
 //   1. Browser tools that run code, touch cookies/storage, read raw network
 //      traffic or upload local files are denied on both browser servers.
-//   2. Interaction tools (click, type, ...) always ask the user.
+//   2. Interaction tools (click, type, ...) ask the user, except a click in the browser
+//      without a login, and a click in the library browser inside an approved batch on a
+//      site where clicks run without asking (known-sites.json, or approved by the user).
 //   3. The library (logged-in) browser opens only papers in an approved batch:
 //      the first page load of a batch asks the user to approve it, a batch that
-//      grows asks again, and a site outside the batch asks.
+//      grows asks again, and a site outside the batch asks. Sites the user approved
+//      before, and known publisher redirects (known-sites.json), are listed in the
+//      batch prompt instead of asking again. A page load or click that starts more
+//      than one download, or an archive, stops the batch until the user approves again.
 //   4. Page loads on the library browser are budgeted per approved paper and
 //      capped per burst and per 24 hours, including a page that a click, key
 //      press or form action opens. Counting happens before the call, so a
@@ -23,6 +28,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PLUGIN = 'lit-fetch-ladder';
 const BROWSER_RE = new RegExp(`^mcp__plugin_${PLUGIN}_(browse|library)__browser_(.+)$`);
@@ -38,6 +44,19 @@ const STATE_FILE = 'lfl-guard-state.json';
 const IDLE_MS = 15 * 60 * 1000, DAY_MS = 24 * 3600 * 1000, APPROVAL_MS = DAY_MS;
 
 // ---------------------------------------------------------------- config
+
+// Publisher sites shipped with the plugin (guard/known-sites.json). `follows`: sites a
+// publisher's pages are known to redirect to or serve files from, listed in a batch prompt
+// like the companions the user approved. `click`: sites where a click in the library browser
+// runs without asking inside an approved batch. A missing or unreadable file means none.
+function knownSites() {
+  try {
+    const k = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'known-sites.json'), 'utf8'));
+    return { follows: k.follows || {}, click: Array.isArray(k.click) ? k.click : [] };
+  } catch {
+    return { follows: {}, click: [] };
+  }
+}
 
 function opt(key, fallback) {
   const v = process.env[`CLAUDE_PLUGIN_OPTION_${key.toUpperCase()}`];
@@ -84,6 +103,7 @@ export function config() {
     secretDir: data ? path.join(data, 'secret') : '',
     stateDir: data ? path.join(data, 'state') : '',
     sessionFile: data ? path.join(data, 'secret', 'library-state.json') : '',
+    known: knownSites(),
   };
 }
 
@@ -221,7 +241,7 @@ function targetSite(cfg, url) {
 }
 
 function findApproval(st, batch, now) {
-  return [...st.approvals].reverse().find((a) => now - a.ts < APPROVAL_MS
+  return [...st.approvals].reverse().find((a) => now - a.ts < APPROVAL_MS && !a.stopped
     && batch.targets.every((t) => a.targets.includes(t)));
 }
 
@@ -283,6 +303,8 @@ function judgeBrowser(cfg, server, tool, input, now, key) {
   if (DENY_RE.test(tool)) return out('deny', `browser tool "${tool}" is disabled (it can run code, read session data, or move local files).`);
   if (ASK_RE.test(tool)) {
     if (server === 'library') return judgeLibraryInteraction(cfg, tool, now, key);
+    // The browser without a login already opens any address without asking, so a click there adds nothing.
+    if (tool === 'click') return ok('a click in the browser without a login');
     return out('ask', `"${tool}" interacts with the page; confirm it is part of fetching a paper you asked for.`);
   }
   if (!ALLOW.has(tool)) return out('ask', `unrecognised browser tool "${tool}"; confirm before it runs.`);
@@ -360,6 +382,9 @@ function judgeLibraryNavigation(cfg, tool, input, url, now, key) {
 // it is charged to the approved batch like a navigation: the caps are checked and one page
 // load is reserved before the call. PostToolUse refunds it if the call opened no page and
 // no tab. With no approved batch there is nothing to charge, so the call is denied.
+// A click on a page of an approved site where clicks run without asking (shipped in
+// known-sites.json, or approved by the user before) is allowed and still charged. A click the
+// user approves on an approved site adds that site to the ones where clicks run without asking.
 function judgeLibraryInteraction(cfg, tool, now, key) {
   const batch = activeBatch(cfg);
   return withLock(cfg, () => {
@@ -374,12 +399,17 @@ function judgeLibraryInteraction(cfg, tool, now, key) {
       saveState(cfg, st);
       return out('deny', `${cap.reason} A click or key press in the logged-in browser can open a page, so it counts.`);
     }
-    (st.reservations ||= {})[key] = { ts: now, approvalTs: approval.ts, burst: st.burst };
+    const site = tool === 'click' && st.lastUrl ? targetSite(cfg, st.lastUrl) : null;
+    const onApproved = !!site && approval.sites.includes(site);
+    const trusted = onApproved && (cfg.known.click.includes(site) || !!(st.clickSites || {})[site]);
+    (st.reservations ||= {})[key] = { ts: now, approvalTs: approval.ts, burst: st.burst, ...(onApproved && !trusted ? { learn: site } : {}) };
     approval.used += 1;
     st.loads.push(now);
     st.burst = { last: now, count: cap.burst };
     saveState(cfg, st);
-    return out('ask', `"${tool}" interacts with the logged-in page; confirm it is part of fetching a paper you asked for. If it opens a page, that counts as one of the batch's page loads.`);
+    if (trusted) return ok(`a click on ${site}, where clicks in an approved batch run without asking; it counts as a page load if it opens one`);
+    return out('ask', `"${tool}" interacts with the logged-in page; confirm it is part of fetching a paper you asked for. If it opens a page, that counts as one of the batch's page loads.`
+      + `${onApproved ? ` If you approve, later clicks on ${site} run without asking (list or forget with /lit-fetch-ladder:sites).` : ''}`);
   });
 }
 
@@ -389,13 +419,24 @@ function askForBatch(cfg, st, batch, key, now) {
   const prev = [...st.approvals].reverse().find((a) => a.batch === batch.name);
   const newTargets = prev ? batch.targets.filter((t) => !prev.targets.includes(t)) : batch.targets;
   const roots = [...new Set([...(prev ? prev.sites : []), ...batch.sites.keys()])];
-  const remembered = companionsFor(st.companions, roots);
+  // The user's earlier approvals and the shipped known redirects, one graph; the prompt says which is which.
+  const follows = {};
+  for (const [from, cs] of Object.entries(cfg.known.follows)) follows[from] = Object.fromEntries(cs.map((c) => [c, 0]));
+  for (const [from, cs] of Object.entries(st.companions || {})) follows[from] = { ...(follows[from] || {}), ...cs };
+  const remembered = companionsFor(follows, roots);
   for (const c of roots) remembered.delete(c);
+  const learned = new Map([...remembered].filter(([c, from]) => (st.companions || {})[from]?.[c] !== undefined));
+  const known = new Map([...remembered].filter(([c]) => !learned.has(c)));
   const sites = [...new Set([...roots, ...remembered.keys()])];
-  const alsoText = remembered.size ? ` Also allowed, from your earlier approvals: ${listCompanions(remembered)}.` : '';
+  const alsoText = (learned.size ? ` Also allowed, from your earlier approvals: ${listCompanions(learned)}.` : '')
+    + (known.size ? ` Also allowed, as known redirects of these publishers: ${listCompanions(known)}.` : '');
   st.pending = { kind: 'batch', call: key, batch: batch.name, targets: batch.targets, sites,
     used: (prev ? prev.used : 0) + 1, replaces: prev ? prev.ts : null, ts: now };
   const budget = batch.targets.length * cfg.perPaper;
+  if (prev && prev.stopped) {
+    return out('ask', `batch "${batch.name}" was stopped: ${prev.stopped} Continue it only if that was what you wanted: `
+      + `${batch.targets.length} paper(s), ${Math.max(0, budget - prev.used)} of ${budget} page loads left. Sites: ${sites.join(', ')}.`);
+  }
   if (!prev) {
     return out('ask', `approve library batch "${batch.name}": ${batch.targets.length} paper(s), up to ${budget} page loads. `
       + `Sites the logged-in browser will open: ${listSites(batch.sites)}.${alsoText} One approval covers these sites for this batch; any other site will be asked about.`);
@@ -570,16 +611,40 @@ function postToolUse(cfg, ev, now) {
   const navigated = isNavigation(tool, input);
   const interacted = ASK_RE.test(tool);
   if (!navigated && !interacted && tool !== 'tabs') return null;
-  withLock(cfg, () => {
+  // One call that starts several downloads, or an archive, looks like a bulk download (a
+  // publisher's "download full issue"): the files have started, but the batch stops there.
+  const files = downloads(ev.tool_response);
+  const bulk = files.length > 1 || files.some((f) => ARCHIVE_RE.test(f));
+  const stop = bulk ? `one ${navigated ? 'page load' : `"${tool}"`} started ${files.length > 1 ? `${files.length} downloads` : 'an archive download'} `
+    + `(${files.slice(0, 3).join(', ')}${files.length > 3 ? ', ...' : ''}), which looks like a bulk download.` : null;
+  return withLock(cfg, () => {
     const st = loadState(cfg);
     const page = pageState(ev.tool_response);
-    if (interacted) settleInteraction(cfg, st, callKey(ev.tool_name, input), page, now);
+    const clickedOn = interacted && st.lastUrl ? targetSite(cfg, st.lastUrl) : null;
+    if (interacted) settleInteraction(cfg, st, callKey(ev.tool_name, input), page, now, !!stop);
     if (navigated) recordNavigation(cfg, st, ev, tool, input, now);
     if (page.url) st.lastUrl = page.url;
     if (page.tabs) st.tabCount = page.tabs;
+    let res = null;
+    if (stop) {
+      const batch = activeBatch(cfg);
+      const approval = batch && findApproval(st, batch, now);
+      if (approval) approval.stopped = stop;
+      if (clickedOn && st.clickSites) delete st.clickSites[clickedOn];  // a learned click site loses its trust
+      const msg = `lit-fetch-ladder stopped the batch${batch ? ` "${batch.name}"` : ''}: ${stop}`;
+      res = { decision: 'block', reason: `${msg} Stop fetching and tell the user; the next page load in the logged-in browser asks them.`, systemMessage: msg };
+    }
     saveState(cfg, st);
+    return res;
   });
-  return null;
+}
+
+// The files a Playwright MCP result says a call started downloading. A download that
+// finishes later is reported again ("Downloaded file ...") in a later result, which is
+// not counted, so only the starts are read.
+const ARCHIVE_RE = /\.(zip|tar|tgz|gz|bz2|xz|7z|rar)$/i;
+export function downloads(resp) {
+  return [...new Set([...responseText(resp).matchAll(/^- Downloading file (.+?) \.\.\.\s*$/gm)].map((x) => x[1]))];
 }
 
 function recordNavigation(cfg, st, ev, tool, input, now) {
@@ -615,10 +680,13 @@ function recordNavigation(cfg, st, ev, tool, input, now) {
 // An interaction's result. If it opened a page (the address changed, ignoring a #fragment)
 // or a tab (more tabs open than before), the page load reserved for it stands, plus one per
 // extra tab. A result that does not say where the browser is counts as a page load too.
-// Otherwise the reservation is refunded.
-function settleInteraction(cfg, st, key, page, now) {
+// Otherwise the reservation is refunded. A click the user approved on an approved site (the
+// reservation names it) makes that site one where clicks run without asking, unless the click
+// started a bulk download.
+function settleInteraction(cfg, st, key, page, now, bulk) {
   const r = (st.reservations || {})[key];
   if (r) delete st.reservations[key];
+  if (r && r.learn && !bulk) (st.clickSites ||= {})[r.learn] = now;
   const approval = r ? st.approvals.find((a) => a.ts === r.approvalTs) : null;
   const moved = !page.url || !st.lastUrl || pageKey(page.url) !== pageKey(st.lastUrl);
   const loads = (moved ? 1 : 0) + Math.max(0, page.tabs - (st.tabCount || 1));

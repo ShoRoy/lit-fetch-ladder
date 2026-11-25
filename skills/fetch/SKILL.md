@@ -82,7 +82,11 @@ on the command line.
    - `browser_navigate` to the row's `auth_url`. The first load asks the user to approve the batch.
    - **Lands on the library sign-in page:** the saved login has expired. Stop and ask the user to run
      `/lit-fetch-ladder:login`. Do not run it yourself; the plugin blocks it.
-   - **Article page:** get the PDF if the page offers one. A file download lands in
+   - **Article page:** get the PDF if the page offers one. When the snapshot gives the PDF link's
+     address on the same site, `browser_navigate` to that address instead of clicking the link: the
+     guard checks and counts it like any page load, without a prompt inside the approved batch.
+     Click only when the link has no address, and never a link or button that would download more
+     than this paper, such as a whole issue. A file download lands in
      `${CLAUDE_PLUGIN_DATA}/downloads/library/`. If the publisher shows only an in-page viewer, save the
      article's full text from the page snapshot instead. The same goes for a PDF address the browser
      renders rather than downloads (an empty snapshot, no download event): save the page text and note

@@ -53,6 +53,9 @@ four rules.
 - It keeps `hooks/hooks.json` and the guard's own list of tools in step.
 - It never raises the page-load limits or removes a check. Lowering them is welcome.
 
+An entry in `guard/known-sites.json` widens what one approval covers, so add one only for a redirect or
+a site seen in a real run, and say in the pull request where you saw it.
+
 A change that sends data to a new place updates "What is sent where" in
 [docs/safeguards.md](docs/safeguards.md). A new dependency needs a reason. The Python tools have none,
 and the plugin pins one npm package, `@playwright/mcp`. Bumping that pin also means bumping
