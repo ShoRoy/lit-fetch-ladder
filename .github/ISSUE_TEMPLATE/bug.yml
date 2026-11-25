@@ -1,0 +1,34 @@
+name: Bug report
+description: Something in the plugin does not work as the docs say.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste your email, your library's proxy address, or any link copied from a page you opened through your library: such links can carry your session.
+        A way past the guard is a security report: use private reporting (see SECURITY.md), not this form.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you asked for, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce
+      description: The command or request you gave, and any DOIs involved.
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of /lit-fetch-ladder:doctor
+      description: Remove your email and your library's proxy address first.
+      render: text
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Plugin version, Claude Code version (claude --version), operating system, and zotero-mcp-server version if the problem is in filing.
+    validations:
+      required: true

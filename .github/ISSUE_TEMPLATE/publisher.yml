@@ -1,0 +1,45 @@
+name: Publisher does not download
+description: A paper your library gives you access to does not come back as a file.
+labels: [publisher]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Give the DOI and the publisher only. Do not paste your library's proxy address, your email, or any link copied from a page you opened through your library: such links can carry your session.
+        If your library does not subscribe to the journal, the plugin cannot reach the paper; that is not a bug.
+  - type: input
+    id: doi
+    attributes:
+      label: DOI of the paper
+      placeholder: 10.xxxx/...
+    validations:
+      required: true
+  - type: input
+    id: publisher
+    attributes:
+      label: Publisher or site
+      placeholder: e.g. Elsevier (ScienceDirect), Wiley, IEEE
+    validations:
+      required: true
+  - type: dropdown
+    id: access
+    attributes:
+      label: Can you open the PDF yourself through your library?
+      options:
+        - "Yes"
+        - "No"
+        - Not checked
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What the plugin recorded
+      description: The paper's state and note in the manifest (lit-fetch-runs/<batch>/manifest.json), and what the page showed, for example a bot check, a viewer, or a purchase page.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Plugin version, Claude Code version, operating system.

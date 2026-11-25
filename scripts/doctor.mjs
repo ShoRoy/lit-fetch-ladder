@@ -33,7 +33,7 @@ if (pt.status === 0) check(true, 'pdftotext found: downloaded PDFs are checked a
 else note('pdftotext not found (optional): install poppler-utils so downloaded PDFs are checked automatically; without it the agent reads each first page');
 const zc = spawnSync(process.platform === 'win32' ? 'zotero-cli.exe' : 'zotero-cli', ['--help'], { encoding: 'utf8', shell: process.platform === 'win32' });
 if (zc.status === 0) check(true, 'zotero-cli found: fetched batches can be filed into Zotero (lfl zotero)');
-else note('zotero-cli not found (optional): install zotero-mcp-server to file batches into Zotero; see the README');
+else note('zotero-cli not found (optional): install zotero-mcp-server to file batches into Zotero; see docs/zotero.md');
 
 const cacheRoots = [process.env.PLAYWRIGHT_BROWSERS_PATH,
   path.join(os.homedir(), '.cache', 'ms-playwright'),
@@ -42,7 +42,7 @@ const cacheRoots = [process.env.PLAYWRIGHT_BROWSERS_PATH,
 const chromium = cacheRoots.some((r) => fs.existsSync(r) && fs.readdirSync(r).some((d) => d.startsWith('chromium')));
 check(chromium, 'Chromium for Playwright installed', `npx -y -p ${PLAYWRIGHT_MCP} playwright install chromium`);
 // A PDF address renders inside the headless browser unless the browser is told to download PDFs;
-// the managed policy AlwaysOpenPdfExternally does that (README, "PDFs that open in a viewer").
+// the managed policy AlwaysOpenPdfExternally does that (docs/usage.md, "PDFs that open in a viewer").
 // Playwright's build is Chrome for Testing, which reads its own policy directory (compiled in as
 // /etc/opt/chrome_for_testing/policies), not Chrome's or Chromium's.
 const PDF_POLICY_DIR = '/etc/opt/chrome_for_testing/policies/managed';
@@ -58,7 +58,7 @@ if (process.platform === 'linux') {
 }
 if (pdfPolicy) check(pdfPolicy === PDF_POLICY_DIR, `PDF addresses download (policy AlwaysOpenPdfExternally in ${pdfPolicy})`,
   `that directory belongs to another browser; Playwright's Chrome for Testing reads ${PDF_POLICY_DIR}`);
-else note('a PDF that opens in the browser\'s viewer is saved as page text; a policy makes it download (README, "PDFs that open in a viewer")');
+else note('a PDF that opens in the browser\'s viewer is saved as page text; a policy makes it download (docs/usage.md, "PDFs that open in a viewer")');
 
 check(/.+@.+/.test(email), 'contact email set', 'set "Your email" in /config under lit-fetch-ladder (Unpaywall requires one)');
 note(`the browsers identify as desktop Chrome ${CHROME_MAJOR}, without the word "Headless"`);
@@ -82,7 +82,7 @@ if (!suffix) {
       : 'no plugin data directory found; pass --data <dir> (Claude Code sets it when it runs the doctor)');
   }
   if (data) note(`plugin data: ${data}`);
-  check(hasDisplay(), 'a display for the sign-in window', 'see the README section "Signing in from a container"');
+  check(hasDisplay(), 'a display for the sign-in window', 'see "Signing in from a container" in docs/sign-in.md');
 }
 
 console.log(`lit-fetch-ladder doctor\n${rows.join('\n')}`);

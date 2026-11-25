@@ -86,7 +86,7 @@ on the command line.
      `${CLAUDE_PLUGIN_DATA}/downloads/library/`. If the publisher shows only an in-page viewer, save the
      article's full text from the page snapshot instead. The same goes for a PDF address the browser
      renders rather than downloads (an empty snapshot, no download event): save the page text and note
-     that the PDF is a manual export, unless the Chromium policy named in the README is set, which makes
+     that the PDF is a manual export, unless the Chromium policy in the plugin's docs/usage.md is set, which makes
      such addresses download. Many publishers load the article body a few
      seconds after the page, so first `browser_wait_for` the reference list's heading (for example the
      text "References"); waiting loads no page and costs nothing. Then take the snapshot with a short file

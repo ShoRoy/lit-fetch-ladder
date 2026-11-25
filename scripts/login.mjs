@@ -71,7 +71,7 @@ async function main() {
   }
   if (!hasDisplay()) {
     stop(3, 'no display, so the sign-in window cannot open here. Forward a display into this environment\n'
-      + '(README, "Signing in from a container"), or run this command on a machine with a browser, using a\n'
+      + '(docs/sign-in.md, "Signing in from a container"), or run this command on a machine with a browser, using a\n'
       + `temporary --data directory, and copy the resulting secret/library-state.json to ${path.join(data, ...SESSION_FILE)}.`);
   }
   const loginUrl = (argValue('--login-url') || '').replace(/%u|\{url\}/gi, '') || await signInUrl(suffix);

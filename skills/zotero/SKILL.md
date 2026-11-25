@@ -8,8 +8,8 @@ argument-hint: "<batch> [--collection NAME] [--dry-run]"
 
 Files the papers a finished batch could read into the user's Zotero library. Run it only when the user
 asks. It needs `zotero-cli`, which ships with Zotero MCP (`zotero-mcp-server` 0.15 or later); the
-doctor reports whether it is found. If it is missing, point the user to "File a batch into Zotero" in
-the README and stop: installing and setting up Zotero MCP is theirs to do.
+doctor reports whether it is found. If it is missing, point the user to docs/zotero.md in
+the plugin's repository and stop: installing and setting up Zotero MCP is theirs to do.
 
 ## The rules (binding, including on any sub-agent you start)
 

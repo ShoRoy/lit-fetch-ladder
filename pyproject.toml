@@ -17,6 +17,9 @@ lfl = "lit_fetch_ladder.cli:main"
 
 [project.urls]
 Repository = "https://github.com/ShoRoy/lit-fetch-ladder"
+Documentation = "https://github.com/ShoRoy/lit-fetch-ladder/tree/main/docs"
+Changelog = "https://github.com/ShoRoy/lit-fetch-ladder/blob/main/CHANGELOG.md"
+Issues = "https://github.com/ShoRoy/lit-fetch-ladder/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

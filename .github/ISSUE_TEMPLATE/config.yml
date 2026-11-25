@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a way past the guard (private)
+    url: https://github.com/ShoRoy/lit-fetch-ladder/security/advisories/new
+    about: Security reports go through private vulnerability reporting, not public issues.

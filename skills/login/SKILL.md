@@ -24,7 +24,7 @@ The line above, printed by the plugin, says what happened. Tell the user in two 
   ```
 
   Without a display (an SSH session, a plain Docker container, a headless server), point them to
-  "Signing in from a container" in the README.
+  "Signing in from a container" in the plugin's docs/sign-in.md.
 
 If the window shows an error instead of the library's sign-in, they go to their library's website in
 that window, sign in there, open a paper through it and close the window. A library whose sign-in page

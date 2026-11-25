@@ -1,6 +1,6 @@
 {
   "name": "fetch-ladder",
-  "description": "lit-fetch-ladder: literature fetching for coding agents, open access first, with prompt-injection safeguards.",
+  "description": "lit-fetch-ladder: literature fetching for coding agents, open access first, with safeguards enforced as Claude Code hooks.",
   "owner": {
     "name": "Shobhan Roy"
   },
@@ -8,7 +8,7 @@
     {
       "name": "lit-fetch-ladder",
       "source": "./",
-      "description": "Literature fetching for coding agents: open access first, then your library login, with prompt-injection safeguards."
+      "description": "Literature fetching for coding agents: open access first, then a browser and your library login, with safeguards enforced as Claude Code hooks."
     }
   ]
 }

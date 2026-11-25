@@ -1,0 +1,53 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python ${{ matrix.python }}, Node ${{ matrix.node }}
+    # Pinned: ubuntu-latest is Ubuntu 26.04, which has no Python 3.9 build.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest versions the README promises.
+          - python: "3.9"
+            node: "18"
+            newest: false
+          # The newest releases, what a new install gets. This row also runs
+          # the two checks that do not depend on the version.
+          - python: "3.x"
+            node: "lts/*"
+            newest: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Node tests (guard, sign-in, launcher, red-team replay)
+        # A file list, not directories: Node 22 and 24 reject `node --test tests/`.
+        run: node --test tests/*.test.mjs tests/redteam/*.test.mjs
+
+      - name: Install pdftotext, so the real-PDF test runs instead of skipping
+        if: matrix.newest
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends poppler-utils
+
+      - name: Python tests (rungs 0-1, the manifest, filing)
+        run: python -m unittest discover -s tests
+
+      - name: Validate the plugin (manifests, hooks, MCP servers, skills)
+        # Pinned, because the validator's rules change between releases. Needs Node 22+.
+        if: matrix.newest
+        run: npx --yes @anthropic-ai/claude-code@2.1.331 plugin validate --strict .

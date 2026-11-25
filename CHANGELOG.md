@@ -4,15 +4,21 @@
 
 - zotero-mcp 0.16.0 writes attached files to WebDAV directly, and from 0.17.1 `zotero-mcp setup` asks
   for the WebDAV settings and keeps them on a re-run (zotero-mcp #806 and #820, which came out of this
-  plugin's filing runs). The README and the message for a full Zotero Storage quota now name the
+  plugin's filing runs). docs/zotero.md and the message for a full Zotero Storage quota now name the
   version to use.
 - Guard: two Zotero MCP tools added in zotero-mcp 0.16 and 0.17 now ask before they run:
   `zotero_manage_collection` when it updates or deletes a collection (a delete is permanent; a create
   passes, as filing may need one) and `zotero_copy_items_between_libraries`. The hook's matcher changed,
   so restart Claude Code after updating.
-- README: the browser without a login opens any http(s) address without asking; what the guard hook
-  costs per tool call; and that it refuses a shell command naming the sign-in script or the proxy's
-  domain.
+- Fetch skill: the agent stops at a bot check or captcha on a publisher's page and leaves the paper
+  staged for the user, without clicking through, retrying or looking for another route.
+- Docs: the README is now a short overview with a schematic of the pipeline, from the rungs to filing
+  into Zotero MCP. The details moved to four pages in `docs/` (signing in, fetching papers, filing into
+  Zotero, safeguards), and the guard's known limits moved from SECURITY.md to Safeguards. Safeguards now
+  states that the browser without a login opens any http(s) address without asking, what the guard
+  hook costs per tool call, that it refuses a shell command naming the sign-in script or the proxy's
+  domain, and that only browser calls fail closed. Added CONTRIBUTING.md, two issue forms, and tests
+  that run on pull requests and pushes to main. The doctor and the skills point at the new pages.
 
 ## 0.2.0
 
