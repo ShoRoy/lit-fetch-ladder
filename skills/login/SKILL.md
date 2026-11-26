@@ -16,8 +16,12 @@ The line above, printed by the plugin, says what happened. Tell the user in two 
   The login is saved when the window closes; `/lit-fetch-ladder:doctor` then shows its age. Only the
   proxy's own cookies and site storage are kept, and the file is readable only by them.
 - **ALREADY OPEN**: a sign-in window is already open; they finish signing in there.
-- **NOT OPENED**, or no status line: pass on the reason, then show them this command to run in their
-  own terminal. It opens the same window and waits until they close it:
+- **NOT OPENED: the browser cannot start here**: pass on the reason and the command it names, which
+  installs the browser's system libraries and needs root once. The terminal command below would fail
+  the same way, so do not offer it. Without root on this machine, point them to "SSH or a headless
+  server" in the plugin's docs/sign-in.md: sign in on another machine and copy the saved login over.
+- **NOT OPENED** for any other reason, or no status line: pass on the reason, then show them this
+  command to run in their own terminal. It opens the same window and waits until they close it:
 
   ```
   node "${CLAUDE_PLUGIN_ROOT}/scripts/login.mjs" --data "${CLAUDE_PLUGIN_DATA}"

@@ -155,3 +155,27 @@ test('the doctor says when the plugin is installed for every folder (user scope)
   assert.doesNotMatch(out(), /user scope/);
   fs.rmSync(home, { recursive: true, force: true });
 });
+
+test('doctor --preflight names each missing prerequisite with its fix, then the login, before any fetch', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lfl-home-'));
+  const browsers = path.join(home, 'browsers');
+  const doctor = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'doctor.mjs');
+  const run = () => spawnSync(process.execPath, [doctor, '--preflight', '--data', path.join(home, 'data'), '--proxy-suffix', 'proxy.example.edu'],
+    { cwd: home, env: { ...process.env, HOME: home, USERPROFILE: home, PLAYWRIGHT_BROWSERS_PATH: browsers }, encoding: 'utf8' });
+  let r = run();  // no browser at all
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /^MISSING the browser: run npx -y -p @playwright\/mcp@[\d.]+ playwright install chromium/m);
+  assert.match(r.stdout, /only open-access copies can be fetched/);
+  assert.match(r.stdout, /^library login: NEEDED, none saved/m);
+  if (process.platform === 'linux') {  // installed, but it cannot start
+    const chrome = path.join(browsers, `chromium-${CHROMIUM_REVISION}`, 'chrome-linux64', 'chrome');
+    fs.mkdirSync(path.dirname(chrome), { recursive: true });
+    fs.writeFileSync(chrome, '#!/bin/sh\necho "chrome: error while loading shared libraries: libnspr4.so" >&2\nexit 127\n', { mode: 0o755 });
+    r = run();
+    assert.match(r.stdout, /^MISSING the browser's system libraries \(chrome does not start: .*libnspr4\.so\): run .*install-deps chromium, which needs root once/m);
+    fs.writeFileSync(chrome, '#!/bin/sh\necho "Chrome 151"\n', { mode: 0o755 });
+    r = run();
+    assert.doesNotMatch(r.stdout, /MISSING the browser|only open-access/);
+  }
+  fs.rmSync(home, { recursive: true, force: true });
+});

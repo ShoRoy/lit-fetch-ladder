@@ -23,40 +23,69 @@ const rawProxy = argValue('--proxy-suffix', o.proxy_suffix || '').trim();
 const suffix = proxySuffix(rawProxy);
 const LOGIN_MAX_HOURS = 12;
 
-// --login: one line saying whether a library sign-in is needed now, without the checks below.
-// Exits 1 when one is needed. The fetch skill runs this at the start of every fetch.
-if (process.argv.includes('--login')) {
+const win = process.platform === 'win32';
+
+// Whether a library sign-in is needed now: one line, and no network.
+function loginStatus() {
   const sess = suffix && data && path.join(data, ...SESSION_FILE);
   const hours = sess && fs.existsSync(sess) ? (Date.now() - fs.statSync(sess).mtimeMs) / 3600000 : -1;
   const needed = !!suffix && (hours < 0 || hours >= LOGIN_MAX_HOURS);
-  if (!suffix) console.log('library login: not needed (no library proxy set)');
-  else if (hours < 0) console.log('library login: NEEDED, none saved. Sign in with /lit-fetch-ladder:login.');
-  else if (needed) console.log(`library login: NEEDED, saved ${hours.toFixed(1)} h ago and probably expired. Sign in with /lit-fetch-ladder:login.`);
-  else console.log(`library login: saved ${hours.toFixed(1)} h ago`);
-  process.exit(needed ? 1 : 0);
+  if (!suffix) return { needed, line: 'library login: not needed (no library proxy set)' };
+  if (hours < 0) return { needed, line: 'library login: NEEDED, none saved. Sign in with /lit-fetch-ladder:login.' };
+  if (needed) return { needed, line: `library login: NEEDED, saved ${hours.toFixed(1)} h ago and probably expired. Sign in with /lit-fetch-ladder:login.` };
+  return { needed, line: `library login: saved ${hours.toFixed(1)} h ago` };
+}
+
+// What the plugin needs on this machine, checked without the network: Python for the fetch tools,
+// npx and the pinned Chromium (which must also start) for the browsers, pdftotext for the PDF check.
+function prerequisites() {
+  const py = spawnSync(win ? 'python' : 'python3', ['-c', 'import sys;print(sys.version_info[:2]>=(3,9))'], { encoding: 'utf8' });
+  const npx = spawnSync(win ? 'npx.cmd' : 'npx', ['--version'], { encoding: 'utf8', shell: win });
+  const pt = spawnSync(win ? 'pdftotext.exe' : 'pdftotext', ['-v'], { encoding: 'utf8', shell: win });
+  const cacheRoots = browserCacheRoots();
+  // The build the pinned Playwright MCP needs, not any Chromium another project installed.
+  const chromium = cacheRoots.some((r) => fs.existsSync(r) && fs.readdirSync(r).includes(`chromium-${CHROMIUM_REVISION}`));
+  return { python: py.stdout?.trim() === 'True', npx: npx.status === 0, pdftotext: pt.status === 0,
+    chromium, startProblem: chromium ? browserStartProblem(cacheRoots) : '' };
+}
+const INSTALL_CHROMIUM = `npx -y -p ${PLAYWRIGHT_MCP} playwright install chromium`;
+
+// --login: the login line alone. --preflight: each missing prerequisite with its fix, then the login
+// line; the fetch skill runs it first in every fetch. Both exit 1 when the user has something to do.
+if (process.argv.includes('--login')) {
+  const login = loginStatus();
+  console.log(login.line);
+  process.exit(login.needed ? 1 : 0);
+}
+if (process.argv.includes('--preflight')) {
+  const p = prerequisites();
+  const missing = [];
+  if (Number(process.versions.node.split('.')[0]) < 18) missing.push(`Node 18 or later (this is ${process.versions.node})`);
+  if (!p.python) missing.push('python3 3.9 or later, which the fetch tools need');
+  if (!p.npx) missing.push('npx, which comes with Node 18 or later; the browsers need it');
+  if (!p.chromium) missing.push(`the browser: run ${INSTALL_CHROMIUM}`);
+  else if (p.startProblem) missing.push(`the browser's system libraries (${p.startProblem}): run ${BROWSER_DEPS}, which needs root once`);
+  if (!p.pdftotext) missing.push('pdftotext: install poppler-utils, or fetched PDFs stay unconfirmed and are not filed');
+  for (const m of missing) console.log(`MISSING ${m}`);
+  if (!p.npx || !p.chromium || p.startProblem) console.log('Until the browser works, only open-access copies can be fetched (rungs 0 and 1).');
+  const login = loginStatus();
+  console.log(login.line);
+  process.exit(missing.length || login.needed ? 1 : 0);
 }
 
 const nodeMajor = Number(process.versions.node.split('.')[0]);
 check(nodeMajor >= 18, `Node ${process.versions.node}`, 'install Node 18 or later');
-const py = spawnSync(process.platform === 'win32' ? 'python' : 'python3', ['-c', 'import sys;print(sys.version_info[:2]>=(3,9))'], { encoding: 'utf8' });
-check(py.stdout?.trim() === 'True', 'Python 3.9+ for the fetch tools', 'install Python 3.9 or later');
-const npx = spawnSync(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['--version'], { encoding: 'utf8', shell: process.platform === 'win32' });
-check(npx.status === 0, 'npx available', 'npx ships with Node; check your PATH');
-const pt = spawnSync(process.platform === 'win32' ? 'pdftotext.exe' : 'pdftotext', ['-v'], { encoding: 'utf8', shell: process.platform === 'win32' });
-if (pt.status === 0) check(true, 'pdftotext found: downloaded PDFs are checked against the paper they were fetched for');
+const pre = prerequisites();
+check(pre.python, 'Python 3.9+ for the fetch tools', 'install Python 3.9 or later');
+check(pre.npx, 'npx available', 'npx ships with Node; check your PATH');
+if (pre.pdftotext) check(true, 'pdftotext found: downloaded PDFs are checked against the paper they were fetched for');
 else note('pdftotext not found: install poppler-utils. Without it the plugin cannot check a PDF against its paper and Claude Code cannot read one, so PDFs stay unconfirmed and are not filed');
-const zc = spawnSync(process.platform === 'win32' ? 'zotero-cli.exe' : 'zotero-cli', ['--help'], { encoding: 'utf8', shell: process.platform === 'win32' });
+const zc = spawnSync(win ? 'zotero-cli.exe' : 'zotero-cli', ['--help'], { encoding: 'utf8', shell: win });
 if (zc.status === 0) check(true, 'zotero-cli found: fetched batches can be filed into Zotero (lfl zotero)');
 else note('zotero-cli not found (optional): /lit-fetch-ladder:zotero setup installs Zotero MCP, to file batches into Zotero');
 
-const cacheRoots = browserCacheRoots();
-// The build the pinned Playwright MCP needs, not any Chromium another project installed.
-const chromium = cacheRoots.some((r) => fs.existsSync(r) && fs.readdirSync(r).includes(`chromium-${CHROMIUM_REVISION}`));
-check(chromium, `Chromium for Playwright installed (build ${CHROMIUM_REVISION})`, `npx -y -p ${PLAYWRIGHT_MCP} playwright install chromium`);
-if (chromium) {
-  const why = browserStartProblem(cacheRoots);
-  check(!why, 'the browser starts', `${why}; install its system libraries with: ${BROWSER_DEPS} (asks for sudo)`);
-}
+check(pre.chromium, `Chromium for Playwright installed (build ${CHROMIUM_REVISION})`, INSTALL_CHROMIUM);
+if (pre.chromium) check(!pre.startProblem, 'the browser starts', `${pre.startProblem}; install its system libraries with: ${BROWSER_DEPS} (asks for sudo)`);
 // A PDF address renders inside the headless browser unless the browser is told to download PDFs;
 // the managed policy AlwaysOpenPdfExternally does that (docs/usage.md, "PDFs that open in a viewer").
 // Playwright's build is Chrome for Testing, which reads its own policy directory (compiled in as

@@ -55,16 +55,20 @@ on the command line.
 
 ## Procedure
 
-0. **Check the library login**, first thing in every fetch:
+0. **Check what this fetch needs**, first thing in every fetch:
 
    ```
-   node "${CLAUDE_PLUGIN_ROOT}/scripts/doctor.mjs" --login --data "${CLAUDE_PLUGIN_DATA}"
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/doctor.mjs" --preflight --data "${CLAUDE_PLUGIN_DATA}"
    ```
 
-   If it says `NEEDED`, ask the user before fetching anything: they can sign in now with
-   `/lit-fetch-ladder:login` and then tell you to go on, or go on without the library, in which case
-   papers only the library can open stay `NEEDS_AUTH`. Wait for their answer. Only the user can sign in;
-   the plugin blocks you from running it.
+   - Each `MISSING` line names a prerequisite and its fix. Before fetching anything, tell the user each
+     one with its command; installing software on their machine is theirs to do. When the browser is
+     missing or cannot start, ask whether to go on with open-access copies only (rungs 0 and 1).
+   - If the login line says `NEEDED` and the browser works, ask whether they want to sign in now with
+     `/lit-fetch-ladder:login` and then tell you to go on, or to go on without the library, in which
+     case papers only the library can open stay `NEEDS_AUTH`. Only the user can sign in; the plugin
+     blocks you from running it.
+   - Ask everything in one message and wait for the answer.
 1. **Resolve targets.**
    - Topic: `lfl discover "<topic>" --limit N --json > /tmp/cands.json`, show the ranked list, let the
      user pick.

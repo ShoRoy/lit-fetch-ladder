@@ -6,6 +6,13 @@
   every folder, and it was picked on both test machines. The README now names the third option,
   "Install for you, in this repo only (local scope)", and the doctor notes a user-scope install with
   how to move it to one folder.
+- When the browser cannot start, the sign-in's message no longer breaks mid-sentence, and the login
+  skill points to the library install or to signing in on another machine instead of the terminal
+  command, which would fail the same way.
+- Prerequisites first. The README's Quick start opens with what must be on the machine (Node with npx,
+  Python, poppler-utils, and root once on a minimal Linux), and every fetch now starts with
+  `doctor.mjs --preflight`, which names each missing one with its fix before anything is fetched, says
+  when only open-access copies can be fetched, and then gives the login line.
 
 ## 0.2.2
 

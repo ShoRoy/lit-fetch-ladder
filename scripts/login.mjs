@@ -142,8 +142,8 @@ async function main() {
   }
   const broken = browserStartProblem();
   if (broken) {
-    stop(3, `the browser cannot start here (${broken}). Install the system libraries it needs, then sign in\n`
-      + `again:  ${BROWSER_DEPS}   (it asks for sudo)`);
+    stop(3, `the browser cannot start here (${broken}). Install the system libraries it needs, then sign in again:\n`
+      + `  ${BROWSER_DEPS}   (it asks for sudo)`);
   }
   Object.assign(process.env, display.env);  // the browser, and the background copy, inherit it
   const loginUrl = (argValue('--login-url') || '').replace(/%u|\{url\}/gi, '') || await signInUrl(suffix);

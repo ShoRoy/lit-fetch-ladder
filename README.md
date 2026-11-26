@@ -84,9 +84,17 @@ as one pipeline. Without Zotero MCP the plugin fetches as usual. See [Filing int
 
 ## Quick start
 
-It needs Claude Code 2.1.271 or later, Node 18+ and Python 3.9+. Install poppler-utils (`pdftotext`) as
-well: it checks each PDF against its paper, and Claude Code also uses it to read PDFs, so without it a
-PDF stays unconfirmed and is not filed into Zotero. Tested on Linux.
+**Before you install**, have these on the machine where Claude Code runs. Tested on Linux.
+
+| Needed | Why | On Ubuntu |
+|---|---|---|
+| Claude Code 2.1.271 or later | runs the plugin | |
+| Node 18 or later, with npx | the guard and both browsers run on it; install it before the plugin | nodejs.org (on Ubuntu 24.04, `sudo apt install nodejs npm`) |
+| Python 3.9 or later | the fetch tools | `sudo apt install python3` |
+| poppler-utils | checks each PDF against its paper, and lets Claude Code read PDFs; without it a PDF stays unconfirmed and is not filed | `sudo apt install poppler-utils` |
+| root, once, on a server, WSL or Docker | the browser's system libraries (step 3) | |
+
+Each fetch starts by checking these and tells you what is missing, with the command to fix it.
 
 **1. Install for one folder.** Start Claude Code in the folder you use for literature surveys and run
 
@@ -115,8 +123,8 @@ npx -y -p @playwright/mcp@0.0.78 playwright install chromium
 On a minimal Linux (an Ubuntu server, WSL, a Docker image) the browser may also need system libraries:
 `npx -y -p @playwright/mcp@0.0.78 playwright install-deps chromium` installs them, and the doctor says
 when that is needed. It needs root once (sudo); without root, the browsers and the sign-in cannot run
-there. Install Node before the plugin. If Node came later, restart Claude
-Code, open `/mcp` and reconnect the two lit-fetch-ladder servers; otherwise Claude Code waits 15 minutes
+there, and only open-access copies can be fetched. If Node came after the plugin, restart Claude Code,
+open `/mcp` and reconnect the two lit-fetch-ladder servers; otherwise Claude Code waits 15 minutes
 before it tries them again (its message names `stdio`, not Node).
 
 Then run `/lit-fetch-ladder:doctor` in Claude Code to check the setup. Third-party marketplaces do not
