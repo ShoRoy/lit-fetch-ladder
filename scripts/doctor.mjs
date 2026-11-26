@@ -5,6 +5,7 @@
 // The plugin's two settings are read from Claude Code's settings files (pluginConfigs), so
 // the command line never carries the proxy address; --email and --proxy-suffix override them.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { BROWSER_DEPS, CHROME_MAJOR, CHROMIUM_REVISION, PLAYWRIGHT_MCP, browserCacheRoots, browserStartProblem, SESSION_FILE, argValue, defaultDataDir, pluginOptions, proxySuffix, signInUrl } from './common.mjs';
@@ -77,6 +78,16 @@ else note('a PDF that opens in the browser\'s viewer is saved as page text; a po
 
 check(/.+@.+/.test(email), 'contact email set', 'set "Your email" with /plugin configure lit-fetch-ladder@fetch-ladder (Unpaywall requires one)');
 note(`the browsers identify as desktop Chrome ${CHROME_MAJOR}, without the word "Headless"`);
+// The install dialog's first option, "Install for you (user scope)", loads the plugin and its guard in every
+// folder; the README asks for "in this repo only (local scope)". Claude Code records the scope here.
+try {
+  const reg = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json'), 'utf8'));
+  const entries = Object.entries(reg.plugins || {}).filter(([k]) => k.startsWith('lit-fetch-ladder@')).flatMap(([, v]) => [].concat(v));
+  if (entries.some((e) => e && e.scope === 'user')) {
+    note('installed for every folder (user scope), so the guard runs in all your projects. To keep it to one');
+    note('folder, uninstall it in /plugin and install it again choosing "Install for you, in this repo only".');
+  }
+} catch { /* no record of installed plugins */ }
 if (!suffix) {
   note('no library proxy set: the library browser opens publisher sites directly, which works on a');
   note('campus network or VPN. Set "Library proxy" with /plugin configure to sign in elsewhere.');

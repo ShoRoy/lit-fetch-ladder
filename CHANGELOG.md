@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3
+
+- The install dialog's first option, "Install for you (user scope)", loads the plugin and its guard in
+  every folder, and it was picked on both test machines. The README now names the third option,
+  "Install for you, in this repo only (local scope)", and the doctor notes a user-scope install with
+  how to move it to one folder.
+
 ## 0.2.2
 
 - The doctor and the sign-in check that the browser starts, not only that it is installed. On a

@@ -138,3 +138,20 @@ test("npx's PATH gets the running node's folder at the end, so a node started by
   assert.deepEqual(childPath({ Path: 'C:\\x' }, '/n/node'), { key: 'Path', value: ['C:\\x', '/n'].join(sep) });
   assert.deepEqual(childPath({}, '/n/node'), { key: 'PATH', value: '/n' });
 });
+
+test('the doctor says when the plugin is installed for every folder (user scope) instead of one', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lfl-home-'));
+  const doctor = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'doctor.mjs');
+  const out = () => spawnSync(process.execPath, [doctor, '--data', path.join(home, 'data')],
+    { cwd: home, env: { ...process.env, HOME: home, USERPROFILE: home }, encoding: 'utf8' }).stdout;
+  const installed = (scope) => {
+    fs.mkdirSync(path.join(home, '.claude', 'plugins'), { recursive: true });
+    fs.writeFileSync(path.join(home, '.claude', 'plugins', 'installed_plugins.json'),
+      JSON.stringify({ version: 2, plugins: { 'lit-fetch-ladder@fetch-ladder': [{ scope, version: '0.2.2' }] } }));
+  };
+  installed('user');
+  assert.match(out(), /installed for every folder \(user scope\)/);
+  installed('local');
+  assert.doesNotMatch(out(), /user scope/);
+  fs.rmSync(home, { recursive: true, force: true });
+});

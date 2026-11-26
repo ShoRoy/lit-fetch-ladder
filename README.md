@@ -95,10 +95,11 @@ PDF stays unconfirmed and is not filed into Zotero. Tested on Linux.
 /plugin install lit-fetch-ladder@fetch-ladder
 ```
 
-When asked where to install, choose **Install for you, in this repo only** (in VS Code, **Install
-locally**). The plugin and its guard then load only in that folder, where the guard runs before every
-file, shell and web tool call ([what that costs](docs/safeguards.md#what-the-guard-costs)). From a shell,
-the same install is `claude plugin install lit-fetch-ladder@fetch-ladder --scope local`.
+When asked where to install, choose **Install for you, in this repo only (local scope)**, the third
+option, not the first, "Install for you (user scope)" (in VS Code, **Install locally**). The plugin and
+its guard then load only in that folder, where the guard runs before every file, shell and web tool call
+([what that costs](docs/safeguards.md#what-the-guard-costs)). From a shell, the same install is
+`claude plugin install lit-fetch-ladder@fetch-ladder --scope local`.
 
 **2. Enter the two settings** Claude Code asks for (after an install from a shell, run
 `/plugin configure lit-fetch-ladder@fetch-ladder`). Your email is required by Unpaywall. For the library
