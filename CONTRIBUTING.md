@@ -1,8 +1,14 @@
 # Contributing
 
-Issues are welcome, and pull requests are not accepted. The guard and the library login are
-security-sensitive, so the author makes every change. Open an issue that describes the problem, and add
-your idea for a fix if you have one.
+Issues and pull requests are welcome, except for the security-sensitive parts, which only the author
+changes: the guard, the browsers and the sign-in, the agent's safety rules, library writes, what is sent
+where, the build and CI, and the tests and docs that hold them to their promises.
+[`.github/protected-paths.txt`](.github/protected-paths.txt) lists these frozen paths. A pull request
+that changes one fails the "protected paths" check. For those parts, open an issue that describes the
+problem, with your idea for a fix if you have one.
+
+Every pull request is still read in full before it is merged, since all of the plugin's code runs on its
+users' machines.
 
 ## What belongs here
 
@@ -19,13 +25,14 @@ trash.
 - **A publisher that does not download.** Use the "publisher does not download" form. Give the DOI and
   the publisher, never your proxy address or a link copied from a logged-in page, because such links can
   carry your session.
-- **An idea or a change you would like.** Open a blank issue and describe it.
+- **An idea or a change you would like.** Open a blank issue and describe it, or open a pull request if
+  it stays outside the frozen paths.
 - **A way past the guard.** Report it privately, as described in [SECURITY.md](SECURITY.md), not in a
   public issue.
 
 ## Running the tests
 
-To check the guard yourself, clone the repository and run:
+Clone the repository and run:
 
 ```
 node --test tests/*.test.mjs tests/redteam/*.test.mjs   # guard, sign-in, launcher, red-team replay
@@ -34,8 +41,9 @@ claude plugin validate --strict .                         # manifests, hooks, MC
 ```
 
 The Python tests run offline and need nothing beyond the standard library. One test also reads a real
-PDF when `pdftotext` is installed and is skipped otherwise. The same checks run on every push to main, on
-the oldest and the newest Python and Node the plugin supports.
+PDF when `pdftotext` is installed and is skipped otherwise. The same checks run on every pull request and
+every push to main, on the oldest and the newest Python and Node the plugin supports. A change outside
+the frozen paths comes with a test in `tests/test_tools.py` when it changes behaviour.
 
 To try your own copy in Claude Code, add the clone as a marketplace with
 `/plugin marketplace add <path to your clone>` and install the plugin from it. Claude Code reads hooks

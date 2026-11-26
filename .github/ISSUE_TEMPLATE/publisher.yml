@@ -47,4 +47,4 @@ body:
     id: idea
     attributes:
       label: Idea for a fix (optional)
-      description: For example, a redirect the guard should know about. Pull requests are not accepted, so describe it here.
+      description: For example, a redirect the guard should know about. The guard's lists are frozen (see CONTRIBUTING.md), so describe it here.

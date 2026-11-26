@@ -36,4 +36,4 @@ body:
     id: idea
     attributes:
       label: Idea for a fix (optional)
-      description: Pull requests are not accepted, so describe the change you have in mind and the author will make it.
+      description: Describe the change you have in mind. For the frozen, security-sensitive parts (see CONTRIBUTING.md) the author makes it.

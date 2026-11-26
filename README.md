@@ -147,10 +147,9 @@ the article behind the plugin, with the runs and the threat model. Changes: [CHA
 
 ## Contributing
 
-Open an issue to report a problem or to suggest a fix. Because the guard and the library login are
-security-sensitive, the author makes every change, and pull requests are not accepted
-([CONTRIBUTING.md](CONTRIBUTING.md)). Report a way past the guard privately, as described in
-[SECURITY.md](SECURITY.md).
+Issues and pull requests are welcome, except for the security-sensitive parts (the guard, the browsers
+and the sign-in, and the paths [CONTRIBUTING.md](CONTRIBUTING.md) lists), which only the author changes.
+For those, open an issue. Report a way past the guard privately, as described in [SECURITY.md](SECURITY.md).
 
 ## License
 

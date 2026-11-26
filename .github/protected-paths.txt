@@ -1,0 +1,39 @@
+# Frozen paths: only the maintainer changes these. A pull request that touches one fails the
+# "protected paths" check; open an issue instead (see CONTRIBUTING.md).
+# A line ending in / covers everything under it; any other line is one file.
+
+# The guard and what it watches
+guard/
+hooks/
+
+# The browsers and the sign-in
+scripts/
+.mcp.json
+
+# The agent's safety rules
+skills/fetch/
+skills/login/
+skills/sites/
+skills/zotero/
+
+# Library writes, what is sent where, and the commands the guard keys on
+src/lit_fetch_ladder/zotero.py
+src/lit_fetch_ladder/net.py
+src/lit_fetch_ladder/settings.py
+src/lit_fetch_ladder/cli.py
+cli/
+
+# Supply chain, CI, and this list
+pyproject.toml
+.claude-plugin/
+.github/
+
+# The tests that hold the guard, the sign-in and the filing to their behaviour, and the security promises
+tests/guard.test.mjs
+tests/login.test.mjs
+tests/mcp-server.test.mjs
+tests/common.test.mjs
+tests/test_zotero.py
+tests/redteam/
+docs/safeguards.md
+SECURITY.md
