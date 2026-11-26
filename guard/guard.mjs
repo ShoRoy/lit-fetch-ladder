@@ -223,7 +223,8 @@ function activeBatch(cfg) {
     const s = targetSite(cfg, r.auth_url);
     if (s) sites.set(s, (sites.get(s) || 0) + 1);
   }
-  return { name: m.batch || '?', targets, sites };
+  // The name reaches the approval prompt, and the agent can write the manifest: printable characters only.
+  return { name: String(m.batch || '?').replace(/[^\w.-]+/g, '_').slice(0, 60), targets, sites };
 }
 
 // The site a library-browser address belongs to: the publisher behind a proxied
@@ -365,7 +366,11 @@ function judgeLibraryNavigation(cfg, tool, input, url, now, key) {
 
     let decision = null;
     if (!approval) {
-      decision = askForBatch(cfg, st, batch, key, now);
+      decision = askForBatch(cfg, st, batch, key, now, url);
+      if (decision.hookSpecificOutput.permissionDecision === 'deny') {
+        saveState(cfg, st);
+        return decision;
+      }
     } else {
       approval.used += 1;
       if (url) decision = judgeSite(cfg, st, url, approval, batch, key, now);
@@ -414,10 +419,12 @@ function judgeLibraryInteraction(cfg, tool, now, key) {
 }
 
 // First page load of a batch, or of a batch that has grown past its approval: ask,
-// listing every site the logged-in browser will open and what is new.
-function askForBatch(cfg, st, batch, key, now) {
+// listing every site the logged-in browser will open and what is new. The page load
+// itself must be on one of those sites, or the user would approve a prompt that does not name it.
+function askForBatch(cfg, st, batch, key, now, url) {
   const prev = [...st.approvals].reverse().find((a) => a.batch === batch.name);
   const newTargets = prev ? batch.targets.filter((t) => !prev.targets.includes(t)) : batch.targets;
+  const shown = newTargets.slice(0, 5).map((t) => t.replace(/[^\x21-\x7e]+/g, '_').slice(0, 80));  // DOIs from the manifest
   const roots = [...new Set([...(prev ? prev.sites : []), ...batch.sites.keys()])];
   // The user's earlier approvals and the shipped known redirects, one graph; the prompt says which is which.
   const follows = {};
@@ -428,6 +435,11 @@ function askForBatch(cfg, st, batch, key, now) {
   const learned = new Map([...remembered].filter(([c, from]) => (st.companions || {})[from]?.[c] !== undefined));
   const known = new Map([...remembered].filter(([c]) => !learned.has(c)));
   const sites = [...new Set([...roots, ...remembered.keys()])];
+  const site = url ? targetSite(cfg, url) : null;
+  if (!site || !sites.includes(site)) {
+    return out('deny', `a batch starts at one of its staged papers, on a site its approval prompt names (${sites.join(', ')}); `
+      + `${site || 'this page load'} is not one of them. Open a staged paper's auth_url.`);
+  }
   const alsoText = (learned.size ? ` Also allowed, from your earlier approvals: ${listCompanions(learned)}.` : '')
     + (known.size ? ` Also allowed, as known redirects of these publishers: ${listCompanions(known)}.` : '');
   st.pending = { kind: 'batch', call: key, batch: batch.name, targets: batch.targets, sites,
@@ -443,7 +455,7 @@ function askForBatch(cfg, st, batch, key, now) {
   }
   const added = [...batch.sites.keys()].filter((s) => !prev.sites.includes(s));
   return out('ask', `batch "${batch.name}" wants to grow from ${prev.targets.length} to ${batch.targets.length} papers `
-    + `(${newTargets.length} new: ${newTargets.slice(0, 5).join(', ')}${newTargets.length > 5 ? ', ...' : ''}), up to ${budget} page loads in total. `
+    + `(${newTargets.length} new: ${shown.join(', ')}${newTargets.length > 5 ? ', ...' : ''}), up to ${budget} page loads in total. `
     + `New sites: ${added.length ? added.join(', ') : 'none'}. Already approved: ${prev.sites.join(', ')}.`
     + `${[...remembered.keys()].some((c) => !prev.sites.includes(c)) ? alsoText : ''} Approve the larger batch?`);
 }
@@ -476,9 +488,11 @@ const FILE_TOOLS = new Set(['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit'
 // The shell text is read with quotes and backslashes removed and line continuations joined, and
 // without regard to case, so a split, escaped or wrapped verb is still the verb; the command is
 // the first word after zotero-cli's global flags (zotero-mcp 0.15.2), so a search for "batch
-// normalization" does not ask and a note or annotation update does. An expanded, encoded or
-// staged command stays a documented limit of a pattern match.
-const ZOTERO_CLI_RE = /\b(?:zotero-cli(?:\.exe)?|python3?(?:\.\d+)?(?:\s+-\w+)*\s+-m\s+zotero_mcp\.cli_standalone)(?:\s+(?:-v+|--verbose|--json|--))*\s+\$?(?:delete|edit|batch|duplicates\s+merge|library\s+(?:switch|reset)|tags\s[^|;&\n]*--rem\w*|notes\s+(?:update|delete)|annotations\s+(?:update|delete)|collections\s+(?:update|manage))\b/i;
+// normalization" does not ask and a note or annotation update does. Global flags may be shortened
+// (argparse takes --verb for --verbose), the short command names n, ann and coll count, and
+// flags may stand between a command and its subcommand. An expanded, encoded or staged command
+// stays a documented limit of a pattern match.
+const ZOTERO_CLI_RE = /\b(?:zotero-cli(?:\.exe)?|python3?(?:\.\d+)?(?:\s+-\w+)*\s+-m\s+zotero_mcp\.cli_standalone)(?:\s+(?:-\w+|--[\w-]*))*\s+\$?(?:delete|edit|batch|duplicates\s[^|;&\n]*\bmerge|library\s[^|;&\n]*\b(?:switch|reset)|tags\s[^|;&\n]*--rem\w*|(?:notes|n|annotations|ann)(?:\s+-[-\w]+)*\s+(?:update|delete)|(?:annotations|ann)\s[^|;&\n]*\bbatch\b[^|;&\n]*\breplace|(?:collections|coll)(?:\s+-[-\w]+)*\s+(?:update|manage))\b/i;
 // The plugin's own undo: `lfl zotero --trash KEY...` moves a listed set in one command, so one ask covers the list.
 const LFL_TRASH_RE = /\b(?:lfl(?:\.py)?|lit_fetch_ladder(?:\.cli)?)\b[^|;&\n]*\bzotero\b[^|;&\n]*--trash\b/i;
 // Inline code against the plugin's or zotero-mcp's modules, which filing never needs.
@@ -536,6 +550,28 @@ function norm(p) {
   return process.platform === 'win32' ? r.toLowerCase() : r;
 }
 
+// A shell command that names the data directory as a whole (or plugins/data above it), or a
+// glob, "." or ".." under it, reaches the saved login with everything else: grep -r, tar, cp -r,
+// cd. A path to something inside it, and the --data argument the plugin's own commands take,
+// are what the skills need. The directory is matched as configured, as ~/.claude/plugins/data/
+// <this plugin>, and as $CLAUDE_PLUGIN_DATA. Like the other shell rules, a text match.
+const TOKEN_END = `(?=[\\\\/\\s"';|&()<>]|$)`;
+function namesDataDir(cfg, c) {
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const roots = [...new Set([cfg.data, norm(cfg.data)])].filter(Boolean)
+    .map((r) => esc(process.platform === 'win32' ? r.toLowerCase() : r));
+  const stop = `[^\\\\/\\s"';|&()<>]`;
+  const spelled = `[^\\s"';|&()<>]*?plugins[\\\\/]+data(?:[\\\\/]+${stop}*${PLUGIN}${stop}*)?`;
+  const env = '\\$\\{?claude_plugin_data\\}?';
+  const re = new RegExp(`(--data(?:=|\\s+)["']?)?(?:${[...roots, spelled, env].join('|')})${TOKEN_END}([^\\s"';|&()<>]*)`, 'gi');
+  for (const m of c.matchAll(re)) {
+    const rest = m[2];
+    const inside = /^[\\/]+[^\\/*?[{.]/.test(rest) && !/[*?[{]/.test(rest) && !/[\\/]\.\.?(?=[\\/]|$)/.test(rest);
+    if (!inside && !(m[1] && rest === '')) return true;
+  }
+  return false;
+}
+
 function judgeFiles(cfg, tool, input) {
   if (!cfg.data) return null;
   const protectedRoots = [cfg.secretDir, cfg.stateDir].map(norm);
@@ -557,6 +593,9 @@ function judgeFiles(cfg, tool, input) {
     const spelled = new RegExp(`plugins[\\\\/]+data[\\\\/]+[^\\\\/\\s"']*${PLUGIN}[^\\\\/\\s"']*[\\\\/]+(secret|state)(?![\\w-])`, 'i');
     if (markers.some((m) => c.includes(m)) || spelled.test(c)) {
       return out('deny', 'shell access to the saved library login or the guard state is blocked.');
+    }
+    if (namesDataDir(cfg, c)) {
+      return out('deny', 'this command takes the plugin\'s data directory as a whole (grep -r, tar, cp -r, cd, a glob), which holds the saved library login. Name a path inside it, such as downloads/library/<file>.');
     }
     if (cfg.suffix && cfg.mode === 'ezproxy-host' && c.includes('.' + cfg.suffix)) {
       return out('deny', 'proxied addresses are opened only by the library browser, where page loads are approved and counted.');

@@ -21,7 +21,7 @@ def main(argv=None):
     d = sub.add_parser("discover", help="rung 0: ranked search, or a paper's references")
     d.add_argument("query", nargs="?")
     d.add_argument("--refs-of", metavar="DOI")
-    d.add_argument("--limit", type=int, default=15)
+    d.add_argument("--limit", type=int, help="rows to return (default 15, or 200 references with --refs-of)")
     d.add_argument("--from-year", type=int)
     d.add_argument("--open-access", action="store_true")
     d.add_argument("--json", action="store_true")
@@ -124,8 +124,8 @@ def main(argv=None):
         if not a.query and not a.refs_of:
             ap.error("give a query or --refs-of DOI")
         try:
-            rows = discover.refs_of(a.refs_of, email, a.limit) if a.refs_of else \
-                discover.search(a.query, email, a.limit, a.from_year, a.open_access)
+            rows = discover.refs_of(a.refs_of, email, a.limit or 200) if a.refs_of else \
+                discover.search(a.query, email, a.limit or 15, a.from_year, a.open_access)
         except RuntimeError as e:
             print("error: %s" % e, file=sys.stderr)
             return 2

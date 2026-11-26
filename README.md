@@ -9,7 +9,7 @@
 
 <p align="center">
   <b>Literature surveys in Claude Code, open access first.</b><br>
-  Find papers, fetch each one at the lowest rung that works, up to your own library login, and file them into Zotero.
+  Find papers, fetch each one at the lowest rung that works, up to your own library login, and file them into Zotero, so that a RAG over your library works from the full texts, not only the abstracts.
 </p>
 
 <p align="center">
@@ -31,7 +31,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ShoRoy/lit-fetch-ladder/main/docs/assets/pipeline-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/ShoRoy/lit-fetch-ladder/main/docs/assets/pipeline-light.svg">
-    <img src="https://raw.githubusercontent.com/ShoRoy/lit-fetch-ladder/main/docs/assets/pipeline-light.svg" width="900" alt="How lit-fetch-ladder works. A request (a topic, DOIs, or a paper's references) enters a ladder of four rungs: find and rank papers, an open-access copy, a browser without a login, and a browser with your library login. Each paper climbs only as far as it needs. A guard of Claude Code hooks asks you to approve each batch for the browser with your library login and caps its page loads. Every fetched file is checked against its paper and recorded in a manifest, and can then be filed into Zotero through zotero-cli, which bridges to Zotero MCP, a separate project.">
+    <img src="https://raw.githubusercontent.com/ShoRoy/lit-fetch-ladder/main/docs/assets/pipeline-light.svg" width="900" alt="How lit-fetch-ladder works. A request (a topic, DOIs or a paper's references) climbs four rungs: find and rank papers, an open-access copy, a browser without a login, a browser with your library login. Claude Code hooks guard the last rung. Every file is checked against its paper, recorded in a manifest, and can be filed into Zotero through Zotero MCP, a separate project the plugin can install.">
   </picture>
 </p>
 
@@ -42,8 +42,8 @@ topic, a list of DOIs or a paper's references.
 - **Fetches** open access first, through Unpaywall and OpenAlex (rung 1), then opens pages a script
   cannot read in a browser without a login (rung 2), and uses the library browser, with your library
   login, only for what is left (rung 3).
-- **Checks** every file against its paper, by the title of record and the first author on its first
-  pages, so a mislabelled copy is not taken for the paper.
+- **Checks** every file against its paper's title and first author, so a mislabelled copy is not taken
+  for the paper.
 - **Records** every outcome in a manifest (`OA_FETCHED`, `PROXY_FETCHED`, `NEEDS_AUTH`,
   `ABSTRACT_ONLY`, ...), so a survey can say what it missed.
 
@@ -61,21 +61,26 @@ if it follows a planted line anyway.
 - The library browser opens only the papers of a batch you approved, on the sites its approval prompt
   lists, within a page budget and a per-burst and daily cap.
 - Neither browser can run code, read cookies or storage, or read a request's raw headers.
-- The agent's file tools cannot read the saved login, and shell commands that name it are refused.
+- The agent's file tools cannot read the saved login, and shell commands that name it or take the
+  plugin's data folder as a whole are refused.
 - A page load or click that starts a bulk download stops the batch.
 - Changes to your Zotero library beyond filing ask you first.
 
 A red-team replay in `tests/redteam/` feeds the guard what an agent might try after reading a page with
-planted instructions and checks each decision, on every push. The guard enforces rules but is not a
-sandbox. [Safeguards](docs/safeguards.md) says what it covers and what it does not.
+planted instructions and checks each decision, on every push to main and every pull request. The guard
+enforces rules but is not a sandbox. The baseline defence against prompt injection is expected to come
+from the vendor, in Claude Code's permission prompts and the model's own resistance to planted
+instructions, and the guard adds limits on top of it. The plugin is meant for academic research, not for
+fetching items you know are restricted. [Safeguards](docs/safeguards.md) says what the guard covers and
+what it does not.
 
 ## <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/54yyyu/zotero-mcp/v0.17.3/docs/assets/logo-dark.svg"><img src="https://raw.githubusercontent.com/54yyyu/zotero-mcp/v0.17.3/docs/assets/logo-light.svg" width="26" height="26" alt="Zotero MCP logo"></picture> Works with Zotero MCP
 
 [Zotero MCP](https://github.com/54yyyu/zotero-mcp) is a separate project that puts your Zotero library
-in any AI agent, to search, read, cite and annotate. lit-fetch-ladder covers what comes before the
-library. It files a finished batch through `zotero-cli`, which ships with Zotero MCP, by adding items,
-attaching files and writing a note, and its part ends there. Filing is optional, and without Zotero MCP
-the plugin fetches as usual. See [Filing into Zotero](docs/zotero.md).
+in any AI agent, to search, read, cite and annotate. lit-fetch-ladder files a finished batch through
+`zotero-cli`, which ships with Zotero MCP, and its part ends there. `/lit-fetch-ladder:zotero setup`
+installs Zotero MCP and connects it to your folder, so fetching, filing and working with your library run
+as one pipeline. Without Zotero MCP the plugin fetches as usual. See [Filing into Zotero](docs/zotero.md).
 
 ## Quick start
 
@@ -104,9 +109,9 @@ campus network or library VPN.
 npx -y -p @playwright/mcp@0.0.78 playwright install chromium
 ```
 
-Then run `/lit-fetch-ladder:doctor` in Claude Code to check the setup. The plugin pins its version, and
-third-party marketplaces do not update by default. The guard is security code, so turn on auto-update
-for this marketplace in `/plugin` or update after each release ([CHANGELOG.md](CHANGELOG.md)).
+Then run `/lit-fetch-ladder:doctor` in Claude Code to check the setup. Third-party marketplaces do not
+update by default, and the guard is security code, so turn on auto-update for this marketplace in
+`/plugin` or update after each release ([CHANGELOG.md](CHANGELOG.md)).
 
 **4. Fetch.**
 
@@ -116,11 +121,12 @@ for this marketplace in `/plugin` or update after each release ([CHANGELOG.md](C
 /lit-fetch-ladder:fetch the references of 10.1038/nature14539
 ```
 
-**5. Sign in to your library** if you set a proxy. Run `/lit-fetch-ladder:login` yourself, since the agent
-cannot, and sign in to the window it opens. Only the proxy's cookies are saved. See
+**5. Sign in to your library** if you set a proxy. Each fetch first checks for a saved login and, when
+there is none or it is over 12 hours old, asks you to run `/lit-fetch-ladder:login`. Only you can run it.
+Sign in to the window it opens; only the proxy's cookies and site storage are saved. See
 [Signing in](docs/sign-in.md).
 
-**6. File into Zotero** (optional). With Zotero MCP 0.15 or later set up to write to your library, run
+**6. Add Zotero** (optional). Run `/lit-fetch-ladder:zotero setup` once. After a fetch, run
 `/lit-fetch-ladder:zotero <batch>` or ask the agent to file the batch. See
 [Filing into Zotero](docs/zotero.md).
 
@@ -129,7 +135,7 @@ cannot, and sign in to the window it opens. Only the proxy's cookies are saved. 
 Publishers watch for systematic downloading through library proxies, and the usual response is to
 suspend the library's access for everyone at the institution, not only for the person who caused it.
 So the plugin goes open access first, asks you to approve each library batch, and caps the library
-browser's page loads (5 per paper by default, 20 per burst, 60 per 24 hours). Use it for your own
+browser's page loads (5 per paper, 20 per burst, 60 per 24 hours). Use it for your own
 research, on papers you name, with access your library already gives you. If you raise the limits or
 remove a safeguard, the consequences for you and your library are yours.
 
@@ -139,7 +145,7 @@ remove a safeguard, the consequences for you and your library are yours.
 |---|---|
 | [Signing in](docs/sign-in.md) | The library login, what is saved, containers and remote machines, when the window does not open |
 | [Fetching papers](docs/usage.md) | The rungs, what comes back, approving a library batch, PDFs in a viewer, papers that do not come back, use without Claude Code |
-| [Filing into Zotero](docs/zotero.md) | Where the plugin stops and Zotero MCP starts, filing and undoing it, WebDAV |
+| [Filing into Zotero](docs/zotero.md) | Setting up Zotero MCP, filing a batch and undoing it, what the guard asks about |
 | [Safeguards](docs/safeguards.md) | What the guard enforces and costs, what it does not cover, the page-load limits, what is sent where |
 
 Background: [The last rung of an agent-orchestrated literature survey](https://levelup.gitconnected.com/the-last-rung-of-an-agent-run-literature-survey-institutional-login-safeguards-and-plugin-3839ee41aaf9),
@@ -147,9 +153,10 @@ the article behind the plugin, with the runs and the threat model. Changes: [CHA
 
 ## Contributing
 
-Issues and pull requests are welcome, except for the security-sensitive parts (the guard, the browsers
-and the sign-in, and the paths [CONTRIBUTING.md](CONTRIBUTING.md) lists), which only the author changes.
-For those, open an issue. Report a way past the guard privately, as described in [SECURITY.md](SECURITY.md).
+Issues and pull requests are welcome. The security-sensitive parts (the guard, the browsers and the
+sign-in, and the paths [CONTRIBUTING.md](CONTRIBUTING.md) lists) change only through the author, so for
+those open an issue instead; ideas that harden the design are especially welcome there. Report a way past
+the guard privately, as described in [SECURITY.md](SECURITY.md).
 
 ## License
 

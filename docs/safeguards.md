@@ -20,7 +20,7 @@ its message names the rule.
 
 The hook runs before every file read, edit, search, shell command and web fetch in a session where the
 plugin is enabled, and takes about 0.13 s per call (median, measured in a Linux container; 0.22 s at the
-90th percentile). It also refuses any shell command that names the sign-in script or your proxy's domain,
+90th percentile). It also refuses any shell command that names the sign-in script, the plugin's data folder as a whole, or an address under your proxy's domain,
 a harmless one included, so run such commands in your own terminal. Both are reasons to install the
 plugin for one folder.
 
@@ -29,8 +29,8 @@ plugin for one folder.
 | A fetched page tries to... | What happens |
 |---|---|
 | run code in the browser, read cookies or storage, read raw request headers | denied in both browsers (`browser_evaluate`, `browser_run_code_unsafe`, cookie and storage tools, `browser_network_request`, `browser_file_upload`) |
-| open `file://` or any non-http(s) address | denied (Playwright also blocks `file:` by default) |
-| read the saved login | denied for the file tools and for shell commands that name it; the guard also refuses it as a file for Zotero MCP's add and attach tools |
+| open `file://` or any non-http(s) address | denied |
+| read the saved login | denied for the file tools, for shell commands that name it, and for shell commands that take the plugin's data directory as a whole; the guard also refuses it as a file for Zotero MCP's add and attach tools |
 | add papers to the batch | a batch that grows needs your approval again, and the prompt names the new papers and sites |
 | open another site in the library browser | you are asked, and the site joins the batch only if you say yes |
 | redirect the library browser to a site of its choosing | the site it lands on is not trusted, so opening it again asks, and the prompt names the redirect |
@@ -47,33 +47,32 @@ inside it run without a prompt, and so do clicks on a page of a site the batch a
 site is shipped in `guard/known-sites.json` or you approved a click there before. Other clicks, typing
 and other interactions ask. Any of them that opens a page or a tab counts as a page load.
 
-`tests/redteam/` replays what an agent might try after reading a page with planted instructions
-(`tests/redteam/injected-page.html`), checks each of the guard's decisions, and runs with the other
-tests.
-
 ## What the guard does not cover
+
+The guard is a second layer. The baseline defence against prompt injection is expected to come from the
+vendor, in Claude Code's permission prompts and the model's own resistance to planted instructions. The
+plugin is meant for academic research, not for fetching items you know are restricted, and nothing in it
+tells a restricted item from any other.
 
 - The browser without a login opens any http(s) address without asking. An agent that obeyed a planted
   instruction could send what it has read out in an address, as any agent with a browser can.
 - On a campus network or library VPN there is no proxy address to check, so the browser without a login,
   `curl` and WebFetch reach what your library subscribes to with no approval and no cap. Only the fetch
   skill's procedure keeps them to open-access pages.
-- The shell checks on the saved login, the sign-in script and the Zotero commands are pattern matches on
-  the command's text. The Zotero checks read through quotes, escapes and line breaks, and the other two
-  match the command as written. A command that splits, quotes, expands, encodes or stages a path or name
-  can slip past them. The file tools are checked by resolved path.
-- The sign-in can be started another way, for example by a second Claude Code started from the shell. It
-  still needs your password and second factor in a window on your screen, so sign in only to a window you
-  opened with `/lit-fetch-ladder:login`.
+- The shell checks on the saved login, the sign-in script and the Zotero commands match the command's
+  text. A command that splits, quotes, expands, encodes or stages a path or name can slip past them, and
+  such a command could also start the sign-in. Sign in only to a window you opened with
+  `/lit-fetch-ladder:login`. The file tools are checked by resolved path.
+- A shell command that takes the plugin's data directory as a whole (`grep -r`, `tar`, `cp -r`, `cd` or a
+  glob on it) is refused, but one run on a folder further up, such as `~/.claude` or your home folder,
+  also reads the saved login. The file tools are refused such a search; the shell is not.
 - A redirect inside one page load cannot be stopped. The site it lands on is not trusted, and the next
   page load there asks.
 - A click on a site where clicks run without asking is not shown to you first. The guard sees the
   agent's description of the element, not what the click does. Such a click can take the browser to
   another site, as a redirect can, or answer a bot check, and only the fetch skill's rules hold the
   agent back there.
-- The bulk-download stop acts after the call. The downloads that one action started are already under
-  way when the batch stops. The guard reads the downloads reported in the result of the page load or
-  click that started them.
+- The bulk-download stop acts after the call, so the downloads one action started are already under way.
 - The sites shipped in `guard/known-sites.json` are trusted without an earlier approval of yours. The
   batch prompt lists the known redirects, and `/lit-fetch-ladder:sites` lists the click sites.
 - A page that loads another page by itself, with no navigation or click from the agent, is not counted.
@@ -81,9 +80,8 @@ tests.
 - A site approved by mistake stays allowed in batches that include the site it follows, until you forget
   it with `/lit-fetch-ladder:sites`.
 - A tokenised download link on a site that is not proxied is refused only by the fetch skill's rule.
-- Without Node the guard cannot run, so none of its checks apply. The browsers need Node too and do not
-  start. If the guard fails while judging a file, shell or Zotero call, the call goes ahead. Only browser
-  calls fail closed.
+- Without Node neither the guard nor the browsers run. If the guard fails while judging a file, shell or
+  Zotero call, the call goes ahead. Only browser calls fail closed.
 
 ## A second layer in your own settings
 
@@ -101,8 +99,7 @@ doctor prints the same list.
 
 ## Page-load limits
 
-A batch in the library browser may load 5 pages for each approved paper by default, shared across the
-batch, and an option can raise that to 8. On top of that, 20 page loads per burst (a burst ends after 15
+A batch in the library browser may load 5 pages for each approved paper, shared across the batch. On top of that, 20 page loads per burst (a burst ends after 15
 minutes without a page load) and 60 per 24 hours are hard limits. On a campus network or library VPN the
 library browser runs without a login, under the same approvals and limits. These cover a careful survey
 and stop a runaway one. They are set in `guard/guard.mjs`, and you can lower them there.
@@ -111,7 +108,7 @@ and stop a runaway one. They are set in `guard/guard.mjs`, and you can lower the
 ## What is sent where
 
 Your contact email goes only to OpenAlex and Unpaywall, in the request parameter each asks for. Every
-other request the tools make, to doi.org and to open-access hosts, identifies itself only as
+other request the tools make, to doi.org, the publisher pages it redirects to, and open-access hosts, identifies itself only as
 `lit-fetch-ladder/<version>`. The browsers talk to the sites they open and identify themselves as the
 desktop Chrome they are. Their user agent leaves out the word "Headless", which some sites refuse
 outright, and nothing else about them is disguised. Nothing is sent to the author of this plugin.
@@ -122,5 +119,4 @@ Pattern-based scanners for agent plugins can rate this one as dangerous, and NVI
 (v2.13.4) labels it CRITICAL. They match the guard itself, whose tests check that it denies opening
 `file:///etc/passwd` in the browser and fetching a proxied address with `curl`, and the red-team page,
 which carries planted instructions on purpose. The plugin also reads its settings from Claude Code's
-settings files. Read the code and [`SECURITY.md`](../SECURITY.md) before installing, and report a real
-way past the guard privately.
+settings files. Read the code and [`SECURITY.md`](../SECURITY.md) before installing.

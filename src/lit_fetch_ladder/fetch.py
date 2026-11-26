@@ -245,7 +245,7 @@ def mark(batch, base, doi, state, path=None, note=None, email=None, url=None):
         dest = os.path.abspath(path)
         if not dest.startswith(rundir + os.sep):
             os.makedirs(dest_dir, exist_ok=True)
-            dest = os.path.join(dest_dir, os.path.basename(path))
+            dest = os.path.join(dest_dir, net.file_stem(d) + os.path.splitext(path)[1])
             shutil.copy2(path, dest)
         row.update(path=dest, sha256=sha256(dest), kind="pdf" if is_pdf else "fulltext",
                    verified=resolve.matches(dest, row.get("title"), row.get("author")))

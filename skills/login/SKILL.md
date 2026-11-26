@@ -14,7 +14,7 @@ The line above, printed by the plugin, says what happened. Tell the user in two 
 - **OPENING**: a browser window is opening at their library's sign-in page. They sign in the way they
   normally do, open one paper through the library to check they can read it, and close the window.
   The login is saved when the window closes; `/lit-fetch-ladder:doctor` then shows its age. Only the
-  proxy's own cookies are kept, and the file is readable only by them.
+  proxy's own cookies and site storage are kept, and the file is readable only by them.
 - **ALREADY OPEN**: a sign-in window is already open; they finish signing in there.
 - **NOT OPENED**, or no status line: pass on the reason, then show them this command to run in their
   own terminal. It opens the same window and waits until they close it:

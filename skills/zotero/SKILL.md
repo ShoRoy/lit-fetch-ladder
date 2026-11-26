@@ -1,15 +1,34 @@
 ---
 name: zotero
-description: Optional. File a finished lit-fetch-ladder batch into the user's Zotero library through Zotero MCP's zotero-cli, or undo a filing that went wrong. Use only when the user asks to file a batch into Zotero or to undo one; a fetch never files on its own. Needs Zotero MCP, installed and set up by the user.
-argument-hint: "<batch> [--collection NAME] [--dry-run]"
+description: Optional. Set up Zotero MCP for this folder, file a finished lit-fetch-ladder batch into the user's Zotero library through Zotero MCP's zotero-cli, or undo a filing that went wrong. Use only when the user asks to set up Zotero, to file a batch into Zotero or to undo one; a fetch never files on its own.
+argument-hint: "setup | <batch> [--collection NAME] [--dry-run]"
 ---
 
 # File a batch into Zotero (optional)
 
 Files the papers a finished batch could read into the user's Zotero library. Run it only when the user
 asks. It needs `zotero-cli`, which ships with Zotero MCP (`zotero-mcp-server` 0.15 or later); the
-doctor reports whether it is found. If it is missing, point the user to docs/zotero.md in
-the plugin's repository and stop: installing and setting up Zotero MCP is theirs to do.
+doctor reports whether it is found. If it is missing, offer the setup below.
+
+## Set up (`setup`, or when the user asks to set up Zotero)
+
+1. If `zotero-mcp version` answers with 0.17.3 or later, go to step 3. If it is older, run
+   `zotero-mcp update` with the user's go-ahead.
+2. Ask whether they want semantic search over the full text of their library. It needs Zotero MCP's
+   `semantic` extra, a download of a few GB (PyTorch and an embedding model). Install with
+   `uv tool install "zotero-mcp-server>=0.17.3"`, or `"zotero-mcp-server[semantic]>=0.17.3"` for
+   semantic search, or the same with `pipx install` if `uv` is missing. Zotero MCP needs Python 3.10+.
+3. Ask the user to run `zotero-mcp setup` in their own terminal. It asks for their Zotero API key and
+   library ID, which stay theirs: never run it yourself, and never ask for the key. On Zotero 10 or newer
+   they can write through the running desktop instead, with `zotero-mcp authorize-local` and **Always
+   Allow**. Wait until they say it is done.
+4. Bridge this folder to the library: `zotero-mcp install-skill --target claude`. It installs Zotero
+   MCP's own `zotero-cli` skill in `.claude/skills/`, so after a restart of Claude Code the agent here
+   can search, read, cite and annotate the library. Skip it if `.claude/skills/zotero-cli` exists or the
+   user already has Zotero MCP's server in Claude Code.
+5. With the semantic extra, tell the user that `zotero-mcp update-db --fulltext` builds the index. It
+   reads the library and writes nothing to it, and takes a while on a large library.
+6. Run the doctor and report its Zotero line.
 
 ## The rules (binding, including on any sub-agent you start)
 
@@ -25,7 +44,7 @@ the plugin's repository and stop: installing and setting up Zotero MCP is theirs
    `python3 "${CLAUDE_PLUGIN_ROOT}/cli/lfl.py" zotero --trash <KEY...>` once with the user's list of
    item keys: the guard asks once for the whole list, and Zotero's trash is recoverable.
 
-## Procedure
+## File a batch
 
 ```
 python3 "${CLAUDE_PLUGIN_ROOT}/cli/lfl.py" zotero --batch <name> [--collection <key, name or parent/child>]

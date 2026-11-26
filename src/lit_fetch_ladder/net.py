@@ -1,6 +1,7 @@
 """Small stdlib HTTP helpers shared by the tools. No third-party dependencies."""
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 
@@ -46,9 +47,20 @@ def get(url, want="json"):
         return None, "bad JSON: %s" % e
 
 
+def file_stem(doi):
+    """A file name made from a DOI, so two papers in one batch never share a file."""
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", doi)
+
+
+DOI_PREFIX = re.compile(r"^(?:(?:https?://)?(?:dx\.)?doi\.org/|doi:\s*)", re.IGNORECASE)
+# A new-style arXiv ID, bare or as an arXiv link, is the paper's DataCite DOI.
+ARXIV_ID = re.compile(r"^(?:arxiv:\s*|(?:https?://)?(?:www\.)?arxiv\.org/(?:abs|pdf)/)?(\d{4}\.\d{4,5})(?:v\d+)?(?:\.pdf)?$",
+                      re.IGNORECASE)
+
+
 def norm_doi(s):
-    s = (s or "").strip()
-    for pre in ("https://doi.org/", "http://doi.org/", "doi:"):
-        if s.lower().startswith(pre):
-            s = s[len(pre):]
+    s = DOI_PREFIX.sub("", (s or "").strip())
+    m = ARXIV_ID.match(s)
+    if m:
+        s = "10.48550/arxiv." + m.group(1)
     return s.lower() or None

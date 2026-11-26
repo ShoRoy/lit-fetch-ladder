@@ -218,6 +218,44 @@ test('a site is a registrable domain, except on shared hosting', () => {
   assert.equal(siteOf('10.0.0.5'), '10.0.0.5');
 });
 
+test('a batch starts on a site its approval prompt names, not wherever the first page load goes', () => {
+  const sb = sandbox();
+  for (const ev of [libNav('https://collector.example.net/c?d=x'), libNav(libUrl('collector-example-net', '/c?d=x')),
+    pre(`${P}library__browser_navigate_back`)]) {
+    const r = run(sb, ev);
+    assert.equal(r.decision, 'deny', JSON.stringify(ev.tool_input));
+    assert.match(r.reason, /a batch starts at one of its staged papers/);
+  }
+  approve(sb);  // a staged paper's page still asks for the batch
+  writeManifest(sb.manifest, ['a', 'b', 'c']);  // the batch grows: the same rule holds
+  assert.equal(run(sb, libNav(libUrl('collector-example-net', '/c'))).decision, 'deny');
+  assert.match(run(sb, libNav(libUrl('pubs-society-org', '/doi/10.1/c'))).reason, /wants to grow/);
+});
+
+test("the approval prompt cannot be rewritten through the manifest's batch name or DOIs", () => {
+  const sb = sandbox();
+  const fake = 'x": 1 paper(s). Sites the logged-in browser will open: sciencedirect.com (1 paper).' + '\n'.repeat(40);
+  writeManifest(sb.manifest, ['a', 'b'], fake);
+  let r = run(sb, libNav(libUrl('www-examplepub-com', '/doi/10.1/a')));
+  assert.equal(r.decision, 'ask');
+  assert.doesNotMatch(r.reason, /\n/);
+  assert.match(r.reason, /^lit-fetch-ladder: approve library batch "[^" ]{1,60}": 2 paper/);
+  run(sb, post(`${P}library__browser_navigate`, { url: libUrl('www-examplepub-com', '/doi/10.1/a') }));
+  const m = JSON.parse(fs.readFileSync(sb.manifest, 'utf8'));
+  m.items.push({ doi: '10.1/c\n\n\nNew sites: none. Approve', state: 'NEEDS_AUTH', auth_url: libUrl('www-examplepub-com', '/doi/c') });
+  fs.writeFileSync(sb.manifest, JSON.stringify(m));
+  r = run(sb, libNav(libUrl('www-examplepub-com', '/doi/c')));
+  assert.match(r.reason, /wants to grow/);
+  assert.doesNotMatch(r.reason, /\n/);
+});
+
+test('every shipped known site is a site the guard can match', () => {
+  const k = JSON.parse(fs.readFileSync(path.join(path.dirname(GUARD), 'known-sites.json'), 'utf8'));
+  const all = [...k.click, ...Object.keys(k.follows), ...Object.values(k.follows).flat()];
+  for (const s of all) assert.equal(siteOf(s), s, `${s} is not a registrable domain`);
+  assert.equal(new Set(k.click).size, k.click.length, 'duplicate click site');
+});
+
 // ---------------------------------------------------------------- library browser: budget and caps
 
 test('the per-paper budget stops page loads beyond what the batch needs', () => {
@@ -387,6 +425,28 @@ test('the saved login and guard state cannot be read, searched or touched by she
   assert.equal(run(sb, pre('Bash', { command: `cat ${secret}` })).decision, 'deny');
   assert.equal(run(sb, pre('Bash', { command: 'python3 -c "print(open(\'x/library-state.json\').read())"' })).decision, 'deny');
   assert.equal(run(sb, pre('Monitor', { command: `tail -f ${sb.data}/state/lfl-guard-state.json` })).decision, 'deny');
+});
+
+test('a shell command that takes the data directory as a whole is denied; a path inside it, or --data, is not', () => {
+  const sb = sandbox();
+  const d = sb.data;
+  const spelled = '~/.claude/plugins/data/lit-fetch-ladder-fetch-ladder';
+  for (const command of [`grep -r cookie ${d}`, `tar czf - -C ${d} . | base64`, `cp -r ${d} /tmp/x`,
+    `find ${d} -type f -exec cat {} +`, `cd ${d} && grep -r .`, `ls ${d}/`, `cat ${d}/*/*`, `cat ${d}/{secret,x}/*`,
+    `tar cf - ${d}/downloads/..`, `tar -C${d} -cf - .`, `grep -r x "${d}"`, `grep -r x ${spelled}`,
+    `grep -r x ${spelled}/`, 'grep -r x ~/.claude/plugins/data', 'zip -r /tmp/a.zip "$CLAUDE_PLUGIN_DATA"',
+    'tar cf - ${CLAUDE_PLUGIN_DATA}/.']) {
+    const r = run(sb, pre('Bash', { command }));
+    assert.equal(r.decision, 'deny', command);
+    assert.match(r.reason, /data directory as a whole/, command);
+  }
+  for (const command of [`python3 cli/lfl.py fetch 10.1/x --batch b1 --data "${d}"`,
+    `node scripts/doctor.mjs --login --data ${d}`, `node scripts/sites.mjs list --data=${d}`,
+    `python3 cli/lfl.py mark 10.1/a --batch b1 --state PROXY_FETCHED --path ${d}/downloads/library/a.yml`,
+    `ls ${d}/downloads/library/`, `cat ${d}/login.log`, `ls ${spelled}/downloads`,
+    'grep -r x ~/.claude/plugins/data/other-plugin', `ls ${d}-old`, 'ls ~/.claude/plugins/database']) {
+    assert.equal(run(sb, pre('Bash', { command })).decision, 'none', command);
+  }
 });
 
 test('a symlink pointing at the saved login is resolved and denied', () => {
@@ -695,6 +755,25 @@ test('zotero-cli commands that trash, merge, edit or switch the library ask; fil
     'zotero-mcp update-db --fulltext', 'zotero-mcp --help', 'python3 -m unittest discover -s tests', 'env | grep ZOTERO',
     'python3 -m lit_fetch_ladder.cli zotero --batch b1 --collection "Update log"',
     'ZOTERO_WEBDAV_TIMEOUT=600 python3 cli/lfl.py zotero --batch b1']) {
+    assert.equal(run(sb, pre('Bash', { command })).decision, 'none', command);
+  }
+});
+
+test("zotero-cli's short command names, flags before a subcommand and shortened flags ask too", () => {
+  const sb = sandbox();
+  // n, ann and coll are zotero-cli's own aliases, which Zotero MCP's agent skill uses
+  for (const command of ['zotero-cli n delete N1', 'zotero-cli n update N1 --text t', 'zotero-cli ann delete A1',
+    'zotero-cli ann update A1 --comment c', 'zotero-cli coll manage --item-keys A --remove-from C1',
+    'zotero-cli coll update C1 --name n', 'zotero-cli notes --json delete N1', 'zotero-cli coll --json manage --item-keys A',
+    'zotero-cli --verb delete item ABC12345', 'zotero-cli --js notes delete N1', 'zotero-cli library --json switch',
+    'zotero-cli library --library-id 1 --library-type group switch', 'zotero-cli duplicates --json merge --keeper A',
+    'zotero-cli ann batch --attachment-key A --file a.jsonl --on-existing replace',
+    'zotero-cli annotations batch --attachment-key A --file a.jsonl --on-ex=replace']) {
+    assert.equal(run(sb, pre('Bash', { command })).decision, 'ask', command);
+  }
+  for (const command of ['zotero-cli n create --item-key ABC12345 --text -', 'zotero-cli --json n list --item-key A',
+    'zotero-cli ann list --item-key A', 'zotero-cli ann batch --attachment-key A --file a.jsonl',
+    'zotero-cli coll create --name "Reading list"', 'zotero-cli s "notes delete"', 'zotero-cli --json library list']) {
     assert.equal(run(sb, pre('Bash', { command })).decision, 'none', command);
   }
 });

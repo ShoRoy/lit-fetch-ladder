@@ -55,10 +55,20 @@ on the command line.
 
 ## Procedure
 
+0. **Check the library login**, first thing in every fetch:
+
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/doctor.mjs" --login --data "${CLAUDE_PLUGIN_DATA}"
+   ```
+
+   If it says `NEEDED`, ask the user before fetching anything: they can sign in now with
+   `/lit-fetch-ladder:login` and then tell you to go on, or go on without the library, in which case
+   papers only the library can open stay `NEEDS_AUTH`. Wait for their answer. Only the user can sign in;
+   the plugin blocks you from running it.
 1. **Resolve targets.**
    - Topic: `lfl discover "<topic>" --limit N --json > /tmp/cands.json`, show the ranked list, let the
      user pick.
-   - References of a paper: `lfl discover --refs-of <DOI> --json`. This reads the reference list from
+   - References of a paper: `lfl discover --refs-of <DOI> --json`. This reads up to 200 references from
      OpenAlex, not from any fetched text.
    - A bare title: disambiguate with `lfl discover "<title>"` first. A title query takes the top match,
      which can be the wrong paper. DOIs are exact.
@@ -94,7 +104,7 @@ on the command line.
      such addresses download. Many publishers load the article body a few
      seconds after the page, so first `browser_wait_for` the reference list's heading (for example the
      text "References"); waiting loads no page and costs nothing. Then take the snapshot with a short file
-     name, which saves it in `${CLAUDE_PLUGIN_DATA}/downloads/library/`, and check that it holds the
+     name ending in `.yml`, which saves it in `${CLAUDE_PLUGIN_DATA}/downloads/library/`, and check that it holds the
      article's sections and reference list, not only the abstract. Then record it:
 
      ```
@@ -135,4 +145,6 @@ on the command line.
 - **Bot check or captcha** ("Are you a robot?" and the like) on a publisher's page: stop on that paper.
   Never click through it, solve it, retry it or look for another route to it. Leave the row staged and
   tell the user, who can open the paper through their library.
+- **Browser not installed:** ask the user to run `npx -y -p @playwright/mcp@0.0.78 playwright install chromium`.
+  The command in Playwright's error installs for a different version.
 - **Network or resolver errors:** rows end as `ERROR` and are retried by re-running the same `fetch`.

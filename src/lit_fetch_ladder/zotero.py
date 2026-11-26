@@ -22,7 +22,7 @@ import os
 import re
 import subprocess
 
-from . import fetch
+from . import fetch, net
 
 FILED = ("OA_FETCHED", "PROXY_FETCHED")
 TAG = "lit-fetch-ladder"
@@ -223,7 +223,7 @@ def plan(row, collection, batch):
     source = ["url", "https://arxiv.org/abs/" + m.group(1)] if m else ["doi", row["doi"]]
     add = ["add"] + source + ["-c", collection, "--create-collections", "--tags", TAG,
                               "--if-exists", "file", "--attach-mode", "none"]
-    stored = re.sub(r"[^A-Za-z0-9._-]+", "_", row["doi"]) + ext
+    stored = net.file_stem(row["doi"]) + ext
     att = ["attach", "<key>", "--file", path, "--filename", stored] if path and ext in ATTACHABLE else None
     note = ["notes", "create", "--item-key", "<key>", "--title", "%s: %s" % (TAG, batch), "--text", "-"]
     return add, att, note

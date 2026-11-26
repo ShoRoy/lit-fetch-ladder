@@ -81,7 +81,7 @@ def _rank(locs):
     return uniq
 
 
-def download(url, outdir):
+def download(url, outdir, name=None):
     """Fetch one PDF. Returns (path, warning). The magic-byte check catches the
     HTML landing or challenge pages that many 'PDF' links actually return."""
     os.makedirs(outdir, exist_ok=True)
@@ -89,7 +89,7 @@ def download(url, outdir):
     if err:
         return None, err
     is_pdf = data[:5] == b"%PDF-"
-    base = urllib.parse.urlparse(url).path.rsplit("/", 1)[-1] or "download"
+    base = name or urllib.parse.urlparse(url).path.rsplit("/", 1)[-1] or "download"
     if not base.lower().endswith(".pdf"):
         base += ".pdf" if is_pdf else ".bin"
     path = os.path.join(outdir, base)
@@ -172,7 +172,7 @@ def resolve(email, doi=None, title=None, download_dir=None):
         result["downloaded"] = {"path": None, "warning": "no direct PDF link among open copies; landing pages only"}
         warnings = []
         for c in [c for c in locs if c["pdf"]][:TRIES]:
-            path, warn = download(c["pdf"], download_dir)
+            path, warn = download(c["pdf"], download_dir, net.file_stem(doi))
             ok = matches(path, meta["title"], meta["author"]) if path and not warn else None
             if ok is False:
                 warn = "open copy did not match the paper"

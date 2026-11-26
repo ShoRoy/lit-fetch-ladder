@@ -70,12 +70,10 @@ def pipeline(t):
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" '
          f'font-family="{FONT}" role="img" aria-labelledby="title desc">',
          '<title id="title">How lit-fetch-ladder works</title>',
-         '<desc id="desc">A request (a topic, DOIs, or a paper\'s references) enters a ladder of four rungs: '
-         'find and rank papers, an open-access copy, a browser without login, and a browser with your library '
-         'login. Each paper climbs only as far as it needs. A guard of Claude Code hooks asks you to approve each '
-         'batch for the browser with your library login and caps its page loads. Every fetched file is checked '
-         'against its paper and recorded in a manifest, and can then '
-         'be filed into Zotero through zotero-cli, which bridges to Zotero MCP, a separate project.</desc>',
+         '<desc id="desc">A request (a topic, DOIs or a paper\'s references) climbs four rungs: find and rank '
+         'papers, an open-access copy, a browser without a login, a browser with your library login. Claude Code '
+         'hooks guard the last rung. Every file is checked against its paper, recorded in a manifest, and can be '
+         'filed into Zotero through Zotero MCP, a separate project the plugin can install.</desc>',
          '<defs>'
          f'<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" '
          f'orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="{t["line"]}"/></marker>'
@@ -130,14 +128,14 @@ def pipeline(t):
     o.append(arrow(682, 220, 682, 246, t["line"]))
     o += box(576, 248, 212, 60, t, "Manifest", ["one recorded outcome per paper"])
     o.append(arrow(682, 308, 682, 334, t["line"]))
-    o += box(576, 336, 212, 60, t, "File into Zotero", ["optional, through zotero-cli"])
+    o += box(576, 336, 212, 60, t, "File into Zotero", ["optional; can install Zotero MCP"])
 
     # The bridge out of this repository.
     o.append(arrow(788, 366, 856, 366, t["zotero"]))
     o.append(text(822, 356, "bridge", t["muted"], 11.5, anchor="middle"))
     o.append(text(954, 300, "outside this repository", t["muted"], 12, anchor="middle"))
     o += box(858, 312, 192, 108, t, "Zotero MCP",
-             ["separate project", "your library: search, read,", "cite and annotate", "from any agent"],
+             ["separate project", "search, read, cite and", "annotate your library", "from any agent"],
              dashed=True, edge=t["zotero"])
     o.append(zotero_mcp_logo(t, 876, 316, 22))
     o.append("</svg>")

@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- Each fetch starts by checking for a saved library login (`doctor.mjs --login`, no network, never the
+  file's contents). When a proxy is set and there is none, or it is more than 12 hours old, the agent
+  asks whether to sign in first with `/lit-fetch-ladder:login` or to fetch without the library.
+- `/lit-fetch-ladder:zotero setup` installs Zotero MCP (0.17.3 or later, with semantic search if you
+  want it), has you run `zotero-mcp setup`, and installs Zotero MCP's `zotero-cli` skill in the folder,
+  so fetching, filing and working with the library run as one pipeline.
+- More publishers' own platforms where a click in the library browser runs without asking inside an
+  approved batch: ACS, Biochemical Society (Portland Press), Cambridge University Press, Cold Spring
+  Harbor Laboratory Press, Company of Biologists, IOP (with ECS), John Benjamins, Microbiology Society,
+  PNAS, Royal Society and Royal Society of Chemistry.
+- Guard: a batch's first page load must be on a site its approval prompt names, so the prompt cannot
+  approve a page load to a site it does not show. The batch name and new DOIs in the prompt are shown
+  as printable text only, so a manifest cannot rewrite or push down the prompt. zotero-cli's short
+  command names (`n`, `ann`, `coll`), flags before a subcommand, shortened global flags and an annotation
+  batch that replaces existing ones now ask, like the full spellings. A shell command that takes the
+  plugin's data directory as a whole (`grep -r`, `tar`, `cp -r`, `cd` or a glob on it) is refused, since
+  the saved login is inside it; a path inside it and the `--data` argument still work.
+- Files are named after the paper's DOI, so two papers whose links end alike (`/pdf`) or two pages saved
+  under one name no longer overwrite each other and get filed under the wrong item.
+- DOI links (`https://doi.org/...`, `dx.doi.org`, `doi: ...`) and arXiv IDs or links are read as DOIs,
+  not as titles to search for.
+- `lfl discover --refs-of` returns up to 200 references instead of the first 15.
+- The doctor checks for the Chromium build the pinned Playwright MCP needs, not any Chromium.
 - Fewer prompts in the library browser. The plugin ships `guard/known-sites.json`: sites publishers are
   known to redirect to (Elsevier's link site to sciencedirect.com and its file host), which a batch
   that includes the publisher lists in its one approval prompt, and sites where a click in the library

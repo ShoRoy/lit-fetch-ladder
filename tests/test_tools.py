@@ -181,6 +181,18 @@ class Driver(Base):
         self.assertIn("1 paper(s) staged for the library browser (budget up to 5 page loads)", text)
 
 
+class Inputs(unittest.TestCase):
+    def test_doi_links_and_arxiv_ids_are_read_as_dois_not_titles(self):
+        for raw in ("10.48550/arXiv.1706.03762", "arXiv:1706.03762", "arxiv: 1706.03762v5", "1706.03762",
+                    "https://arxiv.org/abs/1706.03762v2", "http://arxiv.org/pdf/1706.03762.pdf"):
+            self.assertTrue(fetch.is_doi(raw), raw)
+            self.assertEqual(net.norm_doi(raw), "10.48550/arxiv.1706.03762", raw)
+        for raw in ("https://doi.org/10.1038/nature14539", "https://dx.doi.org/10.1038/NATURE14539",
+                    "doi.org/10.1038/nature14539", "doi: 10.1038/nature14539", "DOI:10.1038/nature14539"):
+            self.assertEqual(net.norm_doi(raw), "10.1038/nature14539", raw)
+        self.assertFalse(fetch.is_doi("Attention is all you need"))
+
+
 class Mark(Base):
     def test_only_outcome_states_can_be_written(self):
         self.run_batch(["10.1/paywalled"])
@@ -207,6 +219,19 @@ class Mark(Base):
         row = fetch.mark("b1", self.tmp, "10.1/paywalled", "PROXY_FETCHED", path=html, note="viewer only")
         self.assertTrue(row["path"].startswith(os.path.join(self.tmp, "b1", "fulltext")))
         self.assertEqual(row["kind"], "fulltext")
+
+    def test_two_pages_saved_under_one_name_stay_two_files(self):
+        self.run_batch(["10.1/paywalled", "10.1/landing"])
+        rows = []
+        for doi, state, sub in (("10.1/paywalled", "PROXY_FETCHED", "d1"), ("10.1/landing", "OA_FETCHED", "d2")):
+            src = os.path.join(self.tmp, sub, "article.md")
+            os.makedirs(os.path.dirname(src))
+            with open(src, "w") as fh:
+                fh.write("text of %s\n\nReferences\n" % doi)
+            rows.append(fetch.mark("b1", self.tmp, doi, state, path=src))
+        self.assertNotEqual(rows[0]["path"], rows[1]["path"])
+        with open(rows[0]["path"]) as fh:
+            self.assertIn("10.1/paywalled", fh.read())
 
     def test_a_page_saved_before_the_body_loaded_is_flagged(self):
         self.run_batch(["10.1/paywalled"])
@@ -336,6 +361,16 @@ class Cli(unittest.TestCase):
                 cli.main(["fetch", "10.1/x", "--batch", "b"])
         self.assertEqual([(c["mode"], c["suffix"]) for c in seen], [("none", None), ("ezproxy-host", SUFFIX)])
 
+    def test_references_are_not_cut_to_the_search_limit(self):
+        with mock.patch.object(discover, "refs_of", return_value=[]) as refs, \
+                mock.patch.object(discover, "search", return_value=[]) as search, \
+                mock.patch.dict(os.environ, {"LFL_EMAIL": "me@example.org"}), mock.patch("sys.stdout"):
+            cli.main(["discover", "--refs-of", "10.1/x", "--json"])
+            cli.main(["discover", "a topic", "--json"])
+            cli.main(["discover", "--refs-of", "10.1/x", "--limit", "5", "--json"])
+        self.assertEqual([c.args[2] for c in refs.call_args_list], [200, 5])
+        self.assertEqual(search.call_args.args[2], 15)
+
 
 # OpenAlex's record for the arXiv DOI of "Attention Is All You Need" (2026-11-08), trimmed to the
 # fields the plugin reads. Next to arXiv it lists PDFs on a preprint server labelled acceptedVersion
@@ -432,7 +467,15 @@ class OpenCopy(unittest.TestCase):
         self.web = {"https://journal.example/wrong.pdf": OTHER_PDF, "https://repo.example/right.pdf": ATTENTION_PDF}
         code, res = resolve.resolve("me@example.org", doi="10.1/attention", download_dir=self.tmp)
         self.assertEqual((res["downloaded"]["url"], res["downloaded"]["verified"]), ("https://repo.example/right.pdf", True))
-        self.assertEqual(os.listdir(self.tmp), ["right.pdf"])  # the wrong file is not kept
+        self.assertEqual(os.listdir(self.tmp), ["10.1_attention.pdf"])  # named by DOI; the wrong file is not kept
+
+    def test_two_papers_whose_links_end_alike_keep_their_own_files(self):
+        self.web = {"https://a.example/x/pdf": ATTENTION_PDF, "https://b.example/y/pdf": OTHER_PDF}
+        pa, _ = resolve.download("https://a.example/x/pdf", self.tmp, net.file_stem("10.1/a"))
+        pb, _ = resolve.download("https://b.example/y/pdf", self.tmp, net.file_stem("10.1/b"))
+        self.assertEqual(sorted(os.listdir(self.tmp)), ["10.1_a.pdf", "10.1_b.pdf"])
+        with open(pa, "rb") as fa, open(pb, "rb") as fb:
+            self.assertEqual((fa.read(), fb.read()), (ATTENTION_PDF, OTHER_PDF))
 
     def test_when_no_copy_is_the_paper_the_row_is_not_fetched(self):
         self.web = {"https://arxiv.org/pdf/1706.03762": OTHER_PDF}

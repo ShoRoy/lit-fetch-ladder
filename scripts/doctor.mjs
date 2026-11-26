@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { CHROME_MAJOR, PLAYWRIGHT_MCP, SESSION_FILE, argValue, defaultDataDir, pluginOptions, proxySuffix, signInUrl } from './common.mjs';
+import { CHROME_MAJOR, CHROMIUM_REVISION, PLAYWRIGHT_MCP, SESSION_FILE, argValue, defaultDataDir, pluginOptions, proxySuffix, signInUrl } from './common.mjs';
 import { hasDisplay } from './login.mjs';
 
 const rows = [];
@@ -21,6 +21,20 @@ const data = argValue('--data') || defaultDataDir();
 const email = argValue('--email', o.contact_email || '');
 const rawProxy = argValue('--proxy-suffix', o.proxy_suffix || '').trim();
 const suffix = proxySuffix(rawProxy);
+const LOGIN_MAX_HOURS = 12;
+
+// --login: one line saying whether a library sign-in is needed now, without the checks below.
+// Exits 1 when one is needed. The fetch skill runs this at the start of every fetch.
+if (process.argv.includes('--login')) {
+  const sess = suffix && data && path.join(data, ...SESSION_FILE);
+  const hours = sess && fs.existsSync(sess) ? (Date.now() - fs.statSync(sess).mtimeMs) / 3600000 : -1;
+  const needed = !!suffix && (hours < 0 || hours >= LOGIN_MAX_HOURS);
+  if (!suffix) console.log('library login: not needed (no library proxy set)');
+  else if (hours < 0) console.log('library login: NEEDED, none saved. Sign in with /lit-fetch-ladder:login.');
+  else if (needed) console.log(`library login: NEEDED, saved ${hours.toFixed(1)} h ago and probably expired. Sign in with /lit-fetch-ladder:login.`);
+  else console.log(`library login: saved ${hours.toFixed(1)} h ago`);
+  process.exit(needed ? 1 : 0);
+}
 
 const nodeMajor = Number(process.versions.node.split('.')[0]);
 check(nodeMajor >= 18, `Node ${process.versions.node}`, 'install Node 18 or later');
@@ -33,14 +47,15 @@ if (pt.status === 0) check(true, 'pdftotext found: downloaded PDFs are checked a
 else note('pdftotext not found (optional): install poppler-utils so downloaded PDFs are checked automatically; without it the agent reads each first page');
 const zc = spawnSync(process.platform === 'win32' ? 'zotero-cli.exe' : 'zotero-cli', ['--help'], { encoding: 'utf8', shell: process.platform === 'win32' });
 if (zc.status === 0) check(true, 'zotero-cli found: fetched batches can be filed into Zotero (lfl zotero)');
-else note('zotero-cli not found (optional): install zotero-mcp-server to file batches into Zotero; see docs/zotero.md');
+else note('zotero-cli not found (optional): /lit-fetch-ladder:zotero setup installs Zotero MCP, to file batches into Zotero');
 
 const cacheRoots = [process.env.PLAYWRIGHT_BROWSERS_PATH,
   path.join(os.homedir(), '.cache', 'ms-playwright'),
   path.join(os.homedir(), 'Library', 'Caches', 'ms-playwright'),
   process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'ms-playwright')].filter(Boolean);
-const chromium = cacheRoots.some((r) => fs.existsSync(r) && fs.readdirSync(r).some((d) => d.startsWith('chromium')));
-check(chromium, 'Chromium for Playwright installed', `npx -y -p ${PLAYWRIGHT_MCP} playwright install chromium`);
+// The build the pinned Playwright MCP needs, not any Chromium another project installed.
+const chromium = cacheRoots.some((r) => fs.existsSync(r) && fs.readdirSync(r).includes(`chromium-${CHROMIUM_REVISION}`));
+check(chromium, `Chromium for Playwright installed (build ${CHROMIUM_REVISION})`, `npx -y -p ${PLAYWRIGHT_MCP} playwright install chromium`);
 // A PDF address renders inside the headless browser unless the browser is told to download PDFs;
 // the managed policy AlwaysOpenPdfExternally does that (docs/usage.md, "PDFs that open in a viewer").
 // Playwright's build is Chrome for Testing, which reads its own policy directory (compiled in as
@@ -75,7 +90,7 @@ if (!suffix) {
     const st = fs.statSync(sess);
     const hours = (Date.now() - st.mtimeMs) / 3600000;
     const privateFile = process.platform === 'win32' || (st.mode & 0o077) === 0;
-    check(hours < 12, `saved library login: ${hours.toFixed(1)} h old`, 'probably expired; run /lit-fetch-ladder:login');
+    check(hours < LOGIN_MAX_HOURS, `saved library login: ${hours.toFixed(1)} h old`, 'probably expired; run /lit-fetch-ladder:login');
     check(privateFile, 'saved login readable only by you', `chmod 600 "${sess}"`);
   } else {
     check(false, 'saved library login', data ? 'run /lit-fetch-ladder:login (the login opens a browser window)'

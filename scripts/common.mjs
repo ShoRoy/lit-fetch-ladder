@@ -10,6 +10,8 @@ import { fileURLToPath } from 'node:url';
 export const PLAYWRIGHT_MCP = '@playwright/mcp@0.0.78';
 // The Chrome that PLAYWRIGHT_MCP bundles (151.0.7922 for 0.0.78). Change it with the pin.
 export const CHROME_MAJOR = 151;
+// The Chromium build PLAYWRIGHT_MCP installs (playwright-core's browsers.json). Change it with the pin.
+export const CHROMIUM_REVISION = 1232;
 export const SESSION_FILE = ['secret', 'library-state.json'];
 
 // Windows needs a shell to run npx.cmd; quote arguments that contain spaces there.

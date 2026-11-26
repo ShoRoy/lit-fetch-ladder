@@ -5,7 +5,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CHROME_MAJOR, defaultDataDir, desktopUserAgent, pluginOptions, proxySuffix, signInUrl } from '../scripts/common.mjs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { CHROME_MAJOR, CHROMIUM_REVISION, SESSION_FILE, defaultDataDir, desktopUserAgent, pluginOptions, proxySuffix, signInUrl } from '../scripts/common.mjs';
 import { proxySuffix as guardProxySuffix } from '../guard/guard.mjs';
 
 test('a script run by hand finds the plugin data directory: the environment, else the one Claude Code keeps', () => {
@@ -73,4 +75,44 @@ test("the scripts read the plugin's settings: user, then project, then project-l
   write(home, 'settings.json', { contact_email: 'me@example.org', proxy_suffix: 'proxy.one.edu' });
   write(cwd, 'settings.local.json', { proxy_suffix: 'proxy.two.edu' });
   assert.deepEqual(pluginOptions(cwd, home), { contact_email: 'me@example.org', proxy_suffix: 'proxy.two.edu' });
+});
+
+test('doctor --login says whether a sign-in is needed, without reading the saved login', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lfl-home-'));
+  const data = path.join(home, 'data');
+  const doctor = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'doctor.mjs');
+  const run = (...args) => spawnSync(process.execPath, [doctor, '--login', '--data', data, ...args],
+    { cwd: home, env: { ...process.env, HOME: home, USERPROFILE: home }, encoding: 'utf8' });
+  let r = run();
+  assert.equal(r.status, 0);
+  assert.match(r.stdout, /not needed \(no library proxy set\)/);
+  r = run('--proxy-suffix', 'proxy.example.edu');
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /NEEDED, none saved/);
+  const sess = path.join(data, ...SESSION_FILE);
+  fs.mkdirSync(path.dirname(sess), { recursive: true });
+  fs.writeFileSync(sess, '{}');
+  r = run('--proxy-suffix', 'proxy.example.edu');
+  assert.equal(r.status, 0);
+  assert.match(r.stdout, /saved 0\.0 h ago/);
+  const old = new Date(Date.now() - 13 * 3600000);
+  fs.utimesSync(sess, old, old);
+  r = run('--proxy-suffix', 'proxy.example.edu');
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /NEEDED, saved 13\.0 h ago and probably expired/);
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
+test('the doctor wants the Chromium build the pinned Playwright MCP needs, not any Chromium', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lfl-home-'));
+  const browsers = path.join(home, 'ms-playwright');
+  const doctor = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'doctor.mjs');
+  const line = () => spawnSync(process.execPath, [doctor, '--data', path.join(home, 'data')],
+    { cwd: home, env: { ...process.env, HOME: home, USERPROFILE: home, PLAYWRIGHT_BROWSERS_PATH: browsers }, encoding: 'utf8' })
+    .stdout.split('\n').find((l) => l.includes('Chromium for Playwright'));
+  fs.mkdirSync(path.join(browsers, 'chromium-1000'), { recursive: true });
+  assert.match(line(), /^FIX /);
+  fs.mkdirSync(path.join(browsers, `chromium-${CHROMIUM_REVISION}`));
+  assert.match(line(), /^ ok /);
+  fs.rmSync(home, { recursive: true, force: true });
 });
