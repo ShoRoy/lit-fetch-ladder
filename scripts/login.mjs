@@ -125,7 +125,7 @@ async function main() {
   const suffix = proxySuffix(argValue('--proxy-suffix') || pluginOptions().proxy_suffix);
   if (!suffix) {
     stop(2, 'no library proxy is set, so there is nothing to sign in to. On a campus network or VPN no login\n'
-      + 'is needed. Otherwise set "Library proxy" in /config under lit-fetch-ladder, or pass --proxy-suffix.');
+      + 'is needed. Otherwise set "Library proxy" with /plugin configure lit-fetch-ladder@fetch-ladder, or pass --proxy-suffix.');
   }
   const openPid = path.join(data, 'login.pid');
   const running = background && fs.existsSync(openPid) ? Number.parseInt(fs.readFileSync(openPid, 'utf8'), 10) : 0;

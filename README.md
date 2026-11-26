@@ -99,7 +99,8 @@ locally**). The plugin and its guard then load only in that folder, where the gu
 file, shell and web tool call ([what that costs](docs/safeguards.md#what-the-guard-costs)). From a shell,
 the same install is `claude plugin install lit-fetch-ladder@fetch-ladder --scope local`.
 
-**2. Enter the two settings** Claude Code asks for. Your email is required by Unpaywall. For the library
+**2. Enter the two settings** Claude Code asks for (after an install from a shell, run
+`/plugin configure lit-fetch-ladder@fetch-ladder`). Your email is required by Unpaywall. For the library
 proxy, paste the address of any paper opened through your library's website, or leave it empty on a
 campus network or library VPN.
 

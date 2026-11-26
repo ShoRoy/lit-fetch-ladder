@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.1
 
 - Each fetch starts by checking for a saved library login (`doctor.mjs --login`, no network, never the
   file's contents). When a proxy is set and there is none, or it is more than 12 hours old, the agent
@@ -58,6 +58,10 @@
   hook costs per tool call, that it refuses a shell command naming the sign-in script or the proxy's
   domain, and that only browser calls fail closed. Added CONTRIBUTING.md, two issue forms, and tests
   that run on pull requests and pushes to main. The doctor and the skills point at the new pages.
+- Contributions: pull requests are welcome outside the security-sensitive paths, which a check on each
+  pull request enforces; changes to those come from the author, and ideas for them come as issues.
+- The two settings are changed with `/plugin configure lit-fetch-ladder@fetch-ladder`, which the
+  README, the doctor and the sign-in now say; an install from a shell does not ask for them.
 
 ## 0.2.0
 

@@ -75,11 +75,11 @@ if (pdfPolicy) check(pdfPolicy === PDF_POLICY_DIR, `PDF addresses download (poli
   `that directory belongs to another browser; Playwright's Chrome for Testing reads ${PDF_POLICY_DIR}`);
 else note('a PDF that opens in the browser\'s viewer is saved as page text; a policy makes it download (docs/usage.md, "PDFs that open in a viewer")');
 
-check(/.+@.+/.test(email), 'contact email set', 'set "Your email" in /config under lit-fetch-ladder (Unpaywall requires one)');
+check(/.+@.+/.test(email), 'contact email set', 'set "Your email" with /plugin configure lit-fetch-ladder@fetch-ladder (Unpaywall requires one)');
 note(`the browsers identify as desktop Chrome ${CHROME_MAJOR}, without the word "Headless"`);
 if (!suffix) {
   note('no library proxy set: the library browser opens publisher sites directly, which works on a');
-  note('campus network or VPN. Set "Library proxy" in /config to sign in from anywhere else.');
+  note('campus network or VPN. Set "Library proxy" with /plugin configure to sign in elsewhere.');
 } else {
   check(true, `library proxy: ${suffix}${rawProxy.toLowerCase() !== suffix ? `  (taken from "${rawProxy}")` : ''}`);
   const url = await signInUrl(suffix);
