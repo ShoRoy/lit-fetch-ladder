@@ -55,20 +55,6 @@ on the command line.
 
 ## Procedure
 
-0. **Check what this fetch needs**, first thing in every fetch:
-
-   ```
-   node "${CLAUDE_PLUGIN_ROOT}/scripts/doctor.mjs" --preflight --data "${CLAUDE_PLUGIN_DATA}"
-   ```
-
-   - Each `MISSING` line names a prerequisite and its fix. Before fetching anything, tell the user each
-     one with its command; installing software on their machine is theirs to do. When the browser is
-     missing or cannot start, ask whether to go on with open-access copies only (rungs 0 and 1).
-   - If the login line says `NEEDED` and the browser works, ask whether they want to sign in now with
-     `/lit-fetch-ladder:login` and then tell you to go on, or to go on without the library, in which
-     case papers only the library can open stay `NEEDS_AUTH`. Only the user can sign in; the plugin
-     blocks you from running it.
-   - Ask everything in one message and wait for the answer.
 1. **Resolve targets.**
    - Topic: `lfl discover "<topic>" --limit N --json > /tmp/cands.json`, show the ranked list, let the
      user pick.
@@ -86,6 +72,22 @@ on the command line.
    Add `--from-json /tmp/cands.json` to take DOIs from a discover result. Open-access PDFs land in
    `lit-fetch-runs/<batch>/pdfs/`. Papers without an open copy are staged `NEEDS_AUTH` with an
    `auth_url`. The batch always finishes; one failure never blocks the rest.
+
+   Then, only if rows are left for a browser (`OA_LANDING` or `NEEDS_AUTH`), check what the browsers
+   need. A batch that open access covered needs no check:
+
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/doctor.mjs" --preflight --data "${CLAUDE_PLUGIN_DATA}"
+   ```
+
+   - Nothing `MISSING` and no login `NEEDED`: go on without mentioning it.
+   - The browser is missing or cannot start: do not ask. Skip rungs 2 and 3, leave those rows staged,
+     and give the fix in the report. Installing software is the user's to do.
+   - Rows need the library (`NEEDS_AUTH`) and the login line says `NEEDED`: ask once, in the message
+     that states the batch (rule 2), how many papers need the library and whether the user wants to
+     sign in with `/lit-fetch-ladder:login` and then tell you to go on, or leave those papers for later.
+     Only the user can sign in; the plugin blocks you from running it. If they answered this earlier in
+     the conversation, follow that answer instead of asking again.
 3. **Rung 2, pages a script cannot read.** For an `OA_LANDING` row whose landing page refuses a plain
    client, open it with the `browse` browser and save the article text or PDF. No login is involved.
    Record what it saved: `lfl mark <DOI> --batch <name> --state OA_FETCHED --path <file>` (the file is
@@ -140,6 +142,8 @@ on the command line.
 6. **Report.** From `lfl show --batch <name>`: a table (title, year, how it was obtained, file, DOI)
    and the list of papers the batch could not get, each with its state. Point out any paper that came
    from a bare title so the user can check it is the right one, and any row carrying a `warning`.
+   If something was missing (the browser, its libraries, `pdftotext` when files stayed unconfirmed),
+   end with one line for each, with the command that fixes it.
 7. **Zotero (optional).** Only if the user asks to file the batch into Zotero, hand over to the
    `zotero` skill (`/lit-fetch-ladder:zotero <batch>`). Do not offer it unprompted.
 

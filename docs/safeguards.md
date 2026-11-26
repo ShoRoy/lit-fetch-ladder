@@ -20,9 +20,10 @@ its message names the rule.
 
 The hook runs before every file read, edit, search, shell command and web fetch in a session where the
 plugin is enabled, and takes about 0.13 s per call (median, measured in a Linux container; 0.22 s at the
-90th percentile). It also refuses any shell command that names the sign-in script, the plugin's data folder as a whole, or an address under your proxy's domain,
-a harmless one included, so run such commands in your own terminal. Both are reasons to install the
-plugin for one folder.
+90th percentile). It also refuses any shell command that names the sign-in script, the plugin's data
+folder as a whole, or an address under your proxy's domain, a harmless one included, so run such
+commands in your own terminal. Both are worth weighing when you choose where to install it: user scope
+loads the plugin in every folder, local scope in one.
 
 ## What the guard enforces
 

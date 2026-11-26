@@ -107,14 +107,14 @@ else note('a PDF that opens in the browser\'s viewer is saved as page text; a po
 
 check(/.+@.+/.test(email), 'contact email set', 'set "Your email" with /plugin configure lit-fetch-ladder@fetch-ladder (Unpaywall requires one)');
 note(`the browsers identify as desktop Chrome ${CHROME_MAJOR}, without the word "Headless"`);
-// The install dialog's first option, "Install for you (user scope)", loads the plugin and its guard in every
-// folder; the README asks for "in this repo only (local scope)". Claude Code records the scope here.
+// Where the plugin loads, as Claude Code records it: user scope is every folder, local or project
+// scope one. Stated as a fact; the choice is the user's.
 try {
   const reg = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json'), 'utf8'));
   const entries = Object.entries(reg.plugins || {}).filter(([k]) => k.startsWith('lit-fetch-ladder@')).flatMap(([, v]) => [].concat(v));
-  if (entries.some((e) => e && e.scope === 'user')) {
-    note('installed for every folder (user scope), so the guard runs in all your projects. To keep it to one');
-    note('folder, uninstall it in /plugin and install it again choosing "Install for you, in this repo only".');
+  const scopes = [...new Set(entries.map((e) => e && e.scope).filter(Boolean))];
+  if (scopes.length) {
+    note(`installed at ${scopes.join(' and ')} scope: the plugin and its guard load ${scopes.includes('user') ? 'in every folder' : 'only in its folder'}`);
   }
 } catch { /* no record of installed plugins */ }
 if (!suffix) {

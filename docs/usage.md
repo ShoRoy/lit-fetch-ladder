@@ -8,9 +8,10 @@
 /lit-fetch-ladder:fetch the references of 10.1038/nature14539
 ```
 
-The agent first checks what the fetch needs (the browser, `pdftotext`, your library login) and asks you
-about anything missing ([Signing in](sign-in.md)). It lists the candidates, tells
-you how many look open access and how many need the library, and runs the batch. It climbs a ladder and stops at the lowest rung that works.
+The agent lists the candidates, tells you how many look open access and how many need the library, and
+runs the batch. It climbs a ladder and stops at the lowest rung that works. When open access leaves
+papers for a browser, it checks the browser and your library login, and asks you at most once
+([Signing in](sign-in.md)).
 
 | Rung | What it does | Runs where |
 |---|---|---|

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.4
+
+- Fewer questions. A fetch no longer checks anything up front. Only when open access leaves papers for
+  a browser does it run `doctor.mjs --preflight`, and it asks about the library login only when
+  papers in the batch need the library, once, with the count, and not again in the same conversation.
+  A missing browser or `pdftotext` is no longer a question: the batch goes on with what works, and
+  the report ends with the fix.
+- Install scope is yours to choose. The README describes user scope (every folder) and local scope
+  (one folder) side by side with what the guard costs wherever it loads, and the doctor states which
+  scope is installed instead of suggesting a reinstall.
+
 ## 0.2.3
 
 - The install dialog's first option, "Install for you (user scope)", loads the plugin and its guard in

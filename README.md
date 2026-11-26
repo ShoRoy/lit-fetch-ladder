@@ -94,20 +94,26 @@ as one pipeline. Without Zotero MCP the plugin fetches as usual. See [Filing int
 | poppler-utils | checks each PDF against its paper, and lets Claude Code read PDFs; without it a PDF stays unconfirmed and is not filed | `sudo apt install poppler-utils` |
 | root, once, on a server, WSL or Docker | the browser's system libraries (step 3) | |
 
-Each fetch starts by checking these and tells you what is missing, with the command to fix it.
+A fetch asks about none of this up front. When a batch has papers that open access did not cover, it
+checks the browser and your library login, asks you at most once, and ends its report with the fix for
+anything missing.
 
-**1. Install for one folder.** Start Claude Code in the folder you use for literature surveys and run
+**1. Install.** Start Claude Code in the folder you use for literature surveys and run
 
 ```
 /plugin marketplace add ShoRoy/lit-fetch-ladder
 /plugin install lit-fetch-ladder@fetch-ladder
 ```
 
-When asked where to install, choose **Install for you, in this repo only (local scope)**, the third
-option, not the first, "Install for you (user scope)" (in VS Code, **Install locally**). The plugin and
-its guard then load only in that folder, where the guard runs before every file, shell and web tool call
-([what that costs](docs/safeguards.md#what-the-guard-costs)). From a shell, the same install is
-`claude plugin install lit-fetch-ladder@fetch-ladder --scope local`.
+When asked where to install, choose the scope that suits you:
+
+- **Install for you (user scope)** loads the plugin and its guard in every folder you open Claude Code in.
+- **Install for you, in this repo only (local scope)** loads them only in this folder (in VS Code,
+  **Install locally**).
+
+Wherever it loads, the guard runs before every file, shell and web tool call and refuses a few shell
+commands ([what that costs](docs/safeguards.md#what-the-guard-costs)). From a shell, the same install is
+`claude plugin install lit-fetch-ladder@fetch-ladder --scope user`, or `--scope local`.
 
 **2. Enter the two settings** Claude Code asks for (after an install from a shell, run
 `/plugin configure lit-fetch-ladder@fetch-ladder`). Your email is required by Unpaywall. For the library
@@ -139,8 +145,9 @@ update by default, and the guard is security code, so turn on auto-update for th
 /lit-fetch-ladder:fetch the references of 10.1038/nature14539
 ```
 
-**5. Sign in to your library** if you set a proxy. Each fetch first checks for a saved login and, when
-there is none or it is over 12 hours old, asks you to run `/lit-fetch-ladder:login`. Only you can run it.
+**5. Sign in to your library** if you set a proxy. When papers in a batch need your library and there is
+no login saved in the last 12 hours, the fetch asks you once to run `/lit-fetch-ladder:login`. Only you
+can run it.
 Sign in to the window it opens; only the proxy's cookies and site storage are saved. See
 [Signing in](docs/sign-in.md).
 

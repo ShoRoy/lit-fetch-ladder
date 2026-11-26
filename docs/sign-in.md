@@ -9,9 +9,9 @@ needed.
 /lit-fetch-ladder:login
 ```
 
-Only you can run this command; the agent cannot. So each fetch starts by checking for a saved login and,
-when there is none or it is more than 12 hours old, asks whether you want to sign in first or fetch
-without the library. A browser window opens at your
+Only you can run this command; the agent cannot. So when papers in a batch need your library and there
+is no login saved in the last 12 hours, the fetch asks you once whether to sign in or leave those papers
+for later. A browser window opens at your
 library's sign-in page, which the plugin works out from your proxy setting. Sign in as you normally do,
 open one paper to check access, and close the window. The login is saved when the window closes, and
 `/lit-fetch-ladder:doctor` shows its age.
