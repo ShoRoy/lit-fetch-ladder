@@ -56,5 +56,6 @@ The sign-in window needs a display, and `/lit-fetch-ladder:doctor` checks that o
 
 Before it opens the window, the sign-in checks that a display answers, not only that one is named. When
 `DISPLAY` is set but no X server answers on it, as seen with VS Code's forwarding on Windows, the window
-opens on Wayland instead. When no display answers, or the browser stops at once, the command says NOT
-OPENED and why. If a window still does not appear, read `login.log` in the plugin's data directory.
+opens on Wayland instead. When no display answers, when the browser lacks system libraries (it then
+names the command that installs them), or when the browser stops at once, the command says NOT OPENED
+and why. If a window still does not appear, read `login.log` in the plugin's data directory.

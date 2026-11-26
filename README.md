@@ -84,8 +84,9 @@ as one pipeline. Without Zotero MCP the plugin fetches as usual. See [Filing int
 
 ## Quick start
 
-It needs Claude Code 2.1.271 or later, Node 18+ and Python 3.9+, with `pdftotext` optional, to check PDFs
-without the agent reading them. Tested on Linux.
+It needs Claude Code 2.1.271 or later, Node 18+ and Python 3.9+. Install poppler-utils (`pdftotext`) as
+well: it checks each PDF against its paper, and Claude Code also uses it to read PDFs, so without it a
+PDF stays unconfirmed and is not filed into Zotero. Tested on Linux.
 
 **1. Install for one folder.** Start Claude Code in the folder you use for literature surveys and run
 
@@ -109,6 +110,13 @@ campus network or library VPN.
 ```
 npx -y -p @playwright/mcp@0.0.78 playwright install chromium
 ```
+
+On a minimal Linux (an Ubuntu server, WSL, a Docker image) the browser may also need system libraries:
+`npx -y -p @playwright/mcp@0.0.78 playwright install-deps chromium` installs them, and the doctor says
+when that is needed. It needs root once (sudo); without root, the browsers and the sign-in cannot run
+there. Install Node before the plugin. If Node came later, restart Claude
+Code, open `/mcp` and reconnect the two lit-fetch-ladder servers; otherwise Claude Code waits 15 minutes
+before it tries them again (its message names `stdio`, not Node).
 
 Then run `/lit-fetch-ladder:doctor` in Claude Code to check the setup. Third-party marketplaces do not
 update by default, and the guard is security code, so turn on auto-update for this marketplace in

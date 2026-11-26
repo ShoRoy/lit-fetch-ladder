@@ -1,6 +1,6 @@
 // Shared by the plugin's scripts: the pinned Playwright MCP package, the browsers' identity,
 // how to read the proxy setting, and how to run npx.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import dns from 'node:dns/promises';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -12,13 +12,60 @@ export const PLAYWRIGHT_MCP = '@playwright/mcp@0.0.78';
 export const CHROME_MAJOR = 151;
 // The Chromium build PLAYWRIGHT_MCP installs (playwright-core's browsers.json). Change it with the pin.
 export const CHROMIUM_REVISION = 1232;
+// What installs the system libraries the browser needs on a minimal Linux (it asks for sudo).
+export const BROWSER_DEPS = `npx -y -p ${PLAYWRIGHT_MCP} playwright install-deps chromium`;
+
+// Where Playwright keeps its browsers.
+export function browserCacheRoots(env = process.env, home = os.homedir()) {
+  return [env.PLAYWRIGHT_BROWSERS_PATH, path.join(home, '.cache', 'ms-playwright'),
+    path.join(home, 'Library', 'Caches', 'ms-playwright'), env.LOCALAPPDATA && path.join(env.LOCALAPPDATA, 'ms-playwright')].filter(Boolean);
+}
+
+// Whether the pinned build's browsers start, not only whether they are installed. On a minimal
+// Linux (an Ubuntu server, WSL, a Docker image) the binaries are there but their system libraries
+// are not, and the browser stops at launch. `--version` loads every library without opening a
+// window, so it fails exactly where a launch would. '' when every installed binary starts.
+export function browserStartProblem(roots = browserCacheRoots(), platform = process.platform) {
+  if (platform !== 'linux') return '';
+  for (const root of roots) {
+    for (const [dir, exe] of [[`chromium-${CHROMIUM_REVISION}`, 'chrome'], [`chromium_headless_shell-${CHROMIUM_REVISION}`, 'chrome-headless-shell']]) {
+      let subs = [];
+      try { subs = fs.readdirSync(path.join(root, dir)); } catch { continue; }
+      for (const bin of subs.map((s) => path.join(root, dir, s, exe)).filter((b) => fs.existsSync(b))) {
+        const r = spawnSync(bin, ['--version'], { encoding: 'utf8', timeout: 15000 });
+        if (r.status === 0) continue;
+        const why = `${r.stderr || ''}\n${r.stdout || ''}`.split('\n').map((l) => l.trim()).find(Boolean);
+        return `${exe} does not start: ${(why || (r.error && r.error.message) || `exit ${r.status}`).slice(0, 200)}`;
+      }
+    }
+  }
+  return '';
+}
 export const SESSION_FILE = ['secret', 'library-state.json'];
 
 // Windows needs a shell to run npx.cmd; quote arguments that contain spaces there.
+// The child's PATH with the folder of the node running this script added at the end. A node started
+// by its full path, its folder not on PATH, then still finds its own npx, and npx (itself a node
+// script) finds node; an npx already on PATH still comes first.
+export function childPath(env = process.env, execPath = process.execPath) {
+  const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') || 'PATH';
+  const dirs = (env[key] || '').split(path.delimiter).filter(Boolean);
+  const own = path.dirname(execPath);
+  return { key, value: (dirs.includes(own) ? dirs : [...dirs, own]).join(path.delimiter) };
+}
+
 export function npx(args, opts = {}) {
   const win = process.platform === 'win32';
-  const a = win ? args.map((x) => (/[\s"]/.test(x) ? `"${x.replace(/"/g, '\\"')}"` : x)) : args;
-  return spawn(win ? 'npx.cmd' : 'npx', a, { stdio: 'inherit', shell: win, ...opts });
+  const q = (x) => (/[\s"]/.test(x) ? `"${x.replace(/"/g, '\\"')}"` : x);
+  const env = opts.env || process.env;
+  const { key, value } = childPath(env);
+  const child = spawn(win ? 'npx.cmd' : 'npx', win ? args.map(q) : args,
+    { stdio: 'inherit', shell: win, ...opts, env: { ...env, [key]: value } });
+  child.on('error', (e) => {
+    console.error(`error: npx could not start (${e.code || e.message}). Install Node 18 or later, which brings npx, or put its folder on PATH.`);
+    process.exit(1);
+  });
+  return child;
 }
 
 export function underSuffix(host, suffix) {

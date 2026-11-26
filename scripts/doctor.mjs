@@ -5,10 +5,9 @@
 // The plugin's two settings are read from Claude Code's settings files (pluginConfigs), so
 // the command line never carries the proxy address; --email and --proxy-suffix override them.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { CHROME_MAJOR, CHROMIUM_REVISION, PLAYWRIGHT_MCP, SESSION_FILE, argValue, defaultDataDir, pluginOptions, proxySuffix, signInUrl } from './common.mjs';
+import { BROWSER_DEPS, CHROME_MAJOR, CHROMIUM_REVISION, PLAYWRIGHT_MCP, browserCacheRoots, browserStartProblem, SESSION_FILE, argValue, defaultDataDir, pluginOptions, proxySuffix, signInUrl } from './common.mjs';
 import { displayPlan } from './login.mjs';
 
 const rows = [];
@@ -44,18 +43,19 @@ const npx = spawnSync(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['--vers
 check(npx.status === 0, 'npx available', 'npx ships with Node; check your PATH');
 const pt = spawnSync(process.platform === 'win32' ? 'pdftotext.exe' : 'pdftotext', ['-v'], { encoding: 'utf8', shell: process.platform === 'win32' });
 if (pt.status === 0) check(true, 'pdftotext found: downloaded PDFs are checked against the paper they were fetched for');
-else note('pdftotext not found (optional): install poppler-utils so downloaded PDFs are checked automatically; without it the agent reads each first page');
+else note('pdftotext not found: install poppler-utils. Without it the plugin cannot check a PDF against its paper and Claude Code cannot read one, so PDFs stay unconfirmed and are not filed');
 const zc = spawnSync(process.platform === 'win32' ? 'zotero-cli.exe' : 'zotero-cli', ['--help'], { encoding: 'utf8', shell: process.platform === 'win32' });
 if (zc.status === 0) check(true, 'zotero-cli found: fetched batches can be filed into Zotero (lfl zotero)');
 else note('zotero-cli not found (optional): /lit-fetch-ladder:zotero setup installs Zotero MCP, to file batches into Zotero');
 
-const cacheRoots = [process.env.PLAYWRIGHT_BROWSERS_PATH,
-  path.join(os.homedir(), '.cache', 'ms-playwright'),
-  path.join(os.homedir(), 'Library', 'Caches', 'ms-playwright'),
-  process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'ms-playwright')].filter(Boolean);
+const cacheRoots = browserCacheRoots();
 // The build the pinned Playwright MCP needs, not any Chromium another project installed.
 const chromium = cacheRoots.some((r) => fs.existsSync(r) && fs.readdirSync(r).includes(`chromium-${CHROMIUM_REVISION}`));
 check(chromium, `Chromium for Playwright installed (build ${CHROMIUM_REVISION})`, `npx -y -p ${PLAYWRIGHT_MCP} playwright install chromium`);
+if (chromium) {
+  const why = browserStartProblem(cacheRoots);
+  check(!why, 'the browser starts', `${why}; install its system libraries with: ${BROWSER_DEPS} (asks for sudo)`);
+}
 // A PDF address renders inside the headless browser unless the browser is told to download PDFs;
 // the managed policy AlwaysOpenPdfExternally does that (docs/usage.md, "PDFs that open in a viewer").
 // Playwright's build is Chrome for Testing, which reads its own policy directory (compiled in as
@@ -103,6 +103,7 @@ if (!suffix) {
 }
 
 console.log(`lit-fetch-ladder doctor\n${rows.join('\n')}`);
+if (suffix) console.log('\nBefore you paste this into an issue, remove your library\'s proxy address and sign-in page.');
 console.log(`
 Optional second layer: Playwright MCP exposes two code-execution tools that the
 plugin's guard denies. To deny them in your own settings as well, add to

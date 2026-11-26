@@ -95,6 +95,25 @@ test('a browser that stops at once is reported as NOT OPENED, with the reason fr
     assert.match(r.stdout, /^NOT OPENED: the browser stopped at once: .*Missing X server or \$DISPLAY/);
   });
 
+test('a browser that lacks its system libraries is reported before any window, with the command that installs them',
+  { skip: process.platform !== 'linux' && 'the start check runs on Linux' }, async () => {
+    const s = scratch();
+    const browsers = path.join(s.root, 'browsers');
+    const chrome = path.join(browsers, 'chromium-1232', 'chrome-linux64', 'chrome');
+    fs.mkdirSync(path.dirname(chrome), { recursive: true });
+    fs.writeFileSync(chrome, '#!/bin/sh\necho "chrome: error while loading shared libraries: libnspr4.so: cannot open shared object file" >&2\nexit 127\n', { mode: 0o755 });
+    const PATH = fakeNpx(s, `touch "${s.root}/npx-ran"`);
+    const wl = await listen(path.join(s.root, 'wl-0'), true);
+    const env = { ...s.env, PATH, PLAYWRIGHT_BROWSERS_PATH: browsers, WAYLAND_DISPLAY: 'wl-0', XDG_RUNTIME_DIR: s.root };
+    delete env.DISPLAY;
+    const r = await startAsync(s, ['--proxy-suffix', 'proxy.example.edu', '--login-url', 'https://login.proxy.example.edu/login'], env);
+    wl.close();
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /^NOT OPENED: the browser cannot start here \(chrome does not start: .*libnspr4\.so.*\)/);
+    assert.match(r.stdout, /playwright install-deps chromium/);
+    assert.equal(fs.existsSync(path.join(s.root, 'npx-ran')), false, 'no browser was started');
+  });
+
 test('a second start while a sign-in window is open does not open another', () => {
   const s = scratch();
   fs.mkdirSync(s.data, { recursive: true });

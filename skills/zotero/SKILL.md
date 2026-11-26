@@ -18,10 +18,12 @@ doctor reports whether it is found. If it is missing, offer the setup below.
    `semantic` extra, a download of a few GB (PyTorch and an embedding model). Install with
    `uv tool install "zotero-mcp-server>=0.17.4"`, or `"zotero-mcp-server[semantic]>=0.17.4"` for
    semantic search, or the same with `pipx install` if `uv` is missing. Zotero MCP needs Python 3.10+.
-3. Ask the user to run `zotero-mcp setup` in their own terminal. It asks for their Zotero API key and
-   library ID, which stay theirs: never run it yourself, and never ask for the key. On Zotero 10 or newer
-   they can write through the running desktop instead, with `zotero-mcp authorize-local` and **Always
-   Allow**. Wait until they say it is done.
+3. Ask the user to run Zotero MCP's setup in their own terminal: `zotero-mcp setup --no-local --no-claude`
+   for the web route (any Zotero version, also from a container), which asks for their Zotero API key,
+   library ID and WebDAV settings; or, with Zotero 10 or newer running on the same machine,
+   `zotero-mcp setup --no-claude` and then `zotero-mcp authorize-local` with **Always Allow**. Plain
+   `zotero-mcp setup` writes the desktop route, which cannot write until authorize-local. Both commands
+   are theirs: never run them yourself, and never ask for the key. Wait until they say it is done.
 4. Bridge this folder to the library: `zotero-mcp install-skill --target claude`. It installs Zotero
    MCP's own `zotero-cli` skill in `.claude/skills/`, so after a restart of Claude Code the agent here
    can search, read, cite and annotate the library. Skip it if `.claude/skills/zotero-cli` exists or the

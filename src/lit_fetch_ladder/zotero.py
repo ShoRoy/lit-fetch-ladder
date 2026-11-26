@@ -94,6 +94,11 @@ def route(env):
     write hands the file to the running Zotero."""
     if env.get("ZOTERO_LOCAL_API_KEY"):
         return "route: files go to the running Zotero desktop, which syncs them itself"
+    if not env.get("ZOTERO_API_KEY"):
+        # `zotero-mcp setup` writes local mode by default, which reads the library but cannot write
+        # to it until authorize-local, or an API key for the web route, is added.
+        return ("route: nothing can be written yet: run `zotero-mcp authorize-local` (Zotero 10 or newer, "
+                "on this machine) or set up the web API with `zotero-mcp setup --no-local`")
     if env.get("ZOTERO_LIBRARY_TYPE") == "group":
         return "route: files go to Zotero Storage (a group library cannot use WebDAV; the quota applies)"
     missing = [k for k in WEBDAV_KEYS if not env.get(k)]

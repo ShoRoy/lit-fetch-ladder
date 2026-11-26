@@ -33,7 +33,8 @@ Every file is also checked against the paper it was fetched for, by the title of
 author's surname on its first pages. An open copy that fails is dropped and the next one tried, so a
 mislabelled copy on a preprint server is not taken for the paper. PDFs are read with `pdftotext` when it
 is installed. Without it, or for a scan, the agent reads the first page and records the result with
-`lfl confirm`.
+`lfl confirm`. Claude Code also needs poppler to read a PDF, so without poppler a PDF stays unconfirmed
+and is not filed.
 
 ## Approving a library batch
 

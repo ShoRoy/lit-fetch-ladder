@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.2.2
+
+- The doctor and the sign-in check that the browser starts, not only that it is installed. On a
+  minimal Linux (an Ubuntu server, WSL, a Docker image) Chromium can lack system libraries and stop at
+  launch; the doctor now marks that FIX, and `/lit-fetch-ladder:login` says NOT OPENED, naming the
+  missing library and `playwright install-deps chromium`. Found in a fresh install on Ubuntu 22.04.
+- poppler-utils (`pdftotext`) is now listed as needed, not optional: without it a PDF cannot be checked
+  against its paper, Claude Code cannot read it either, and it stays unconfirmed and unfiled. The fetch
+  skill leaves such a row unconfirmed and does not install a PDF library.
+- Starting npx no longer crashes when its folder is not on PATH, as with a node started by its full
+  path: the node's own folder is added to the end of npx's PATH, and an npx that still cannot start
+  gives a clear message instead of an unhandled error. The terminal sign-in announces the window only
+  once the browser has started.
+- Filing says "nothing can be written yet" for a Zotero MCP configuration without write access, such
+  as the desktop route `zotero-mcp setup` writes by default before `zotero-mcp authorize-local`, instead
+  of naming Zotero Storage. The setup docs and skill now give `zotero-mcp setup --no-local --no-claude`
+  for the web route, which asks for the API key, library ID and WebDAV settings.
+- A terminal sign-in whose browser stopped says so, instead of "the window may have been closed". The
+  doctor reminds you to remove the proxy address before pasting its output into an issue.
+- The README says to install Node before the plugin, and to reconnect the two browser servers in `/mcp`
+  if Node came later (Claude Code otherwise waits 15 minutes before it retries them).
+
 ## 0.2.1
 
 - Each fetch starts by checking for a saved library login (`doctor.mjs --login`, no network, never the

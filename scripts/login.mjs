@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PLAYWRIGHT_MCP, SESSION_FILE, argValue, npx, pluginOptions, proxySuffix, signInUrl, underSuffix } from './common.mjs';
+import { BROWSER_DEPS, PLAYWRIGHT_MCP, SESSION_FILE, argValue, browserStartProblem, npx, pluginOptions, proxySuffix, signInUrl, underSuffix } from './common.mjs';
 
 export function scopeState(state, suffix) {
   const cookies = state.cookies || [];
@@ -98,7 +98,8 @@ export async function displayPlan(env = process.env, platform = process.platform
 function whyStopped(logFile) {
   let lines = [];
   try { lines = fs.readFileSync(logFile, 'utf8').split('\n').map((l) => l.trim()).filter(Boolean); } catch { /* no log */ }
-  const why = lines.find((l) => /missing x server|cannot open display|executable doesn't exist|error|failed/i.test(l));
+  const why = lines.find((l) => /shared libraries|missing dependencies|missing x server|cannot open display|executable doesn't exist/i.test(l))
+    || lines.find((l) => /error|failed/i.test(l));
   return (why || lines.at(-1) || 'no output').replace(/^[║╔╚═\s]+|[║\s]+$/g, '').slice(0, 200);
 }
 
@@ -139,6 +140,11 @@ async function main() {
       + '(docs/sign-in.md, "Signing in from a container"), or run this command on a machine with a browser, using a\n'
       + `temporary --data directory, and copy the resulting secret/library-state.json to ${path.join(data, ...SESSION_FILE)}.`);
   }
+  const broken = browserStartProblem();
+  if (broken) {
+    stop(3, `the browser cannot start here (${broken}). Install the system libraries it needs, then sign in\n`
+      + `again:  ${BROWSER_DEPS}   (it asks for sudo)`);
+  }
   Object.assign(process.env, display.env);  // the browser, and the background copy, inherit it
   const loginUrl = (argValue('--login-url') || '').replace(/%u|\{url\}/gi, '') || await signInUrl(suffix);
   if (background) {
@@ -153,17 +159,21 @@ async function main() {
   const pidFile = process.env.LFL_LOGIN_PID_FILE;
   if (pidFile) process.on('exit', () => fs.rmSync(pidFile, { force: true }));
 
-  console.log(`\nA browser window is opening${loginUrl ? ` at your library's sign-in page (${loginUrl})` : ''}.`);
-  console.log('Sign in, open one paper through your library to check access, then CLOSE THE WINDOW.');
-  console.log("If the window does not show your library's sign-in, go to your library's website in it, sign in\n"
-    + 'there and open a paper through it, then close the window.\n');
   const child = npx(['-y', '-p', PLAYWRIGHT_MCP, 'playwright', 'open', `--save-storage=${raw}`, ...(loginUrl ? [loginUrl] : [])]);
-  child.on('exit', () => {
+  child.once('spawn', () => {  // only once npx has started, so a failed start is not announced as a window
+    console.log(`\nA browser window is opening${loginUrl ? ` at your library's sign-in page (${loginUrl})` : ''}.`);
+    console.log('Sign in, open one paper through your library to check access, then CLOSE THE WINDOW.');
+    console.log("If the window does not show your library's sign-in, go to your library's website in it, sign in\n"
+      + 'there and open a paper through it, then close the window.\n');
+  });
+  child.on('exit', (code) => {
     let state;
     try {
       state = JSON.parse(fs.readFileSync(raw, 'utf8'));
     } catch {
-      console.error('No login was saved (the window may have been closed before the page loaded).');
+      console.error(code
+        ? `No login was saved: the browser stopped (exit ${code}) before a sign-in was captured; the lines above say why.`
+        : 'No login was saved: the window was closed before the page loaded.');
       process.exit(1);
     }
     fs.rmSync(raw, { force: true });

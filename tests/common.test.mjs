@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { CHROME_MAJOR, CHROMIUM_REVISION, SESSION_FILE, defaultDataDir, desktopUserAgent, pluginOptions, proxySuffix, signInUrl } from '../scripts/common.mjs';
+import { BROWSER_DEPS, CHROME_MAJOR, CHROMIUM_REVISION, SESSION_FILE, browserStartProblem, childPath, defaultDataDir, desktopUserAgent, pluginOptions, proxySuffix, signInUrl } from '../scripts/common.mjs';
 import { proxySuffix as guardProxySuffix } from '../guard/guard.mjs';
 
 test('a script run by hand finds the plugin data directory: the environment, else the one Claude Code keeps', () => {
@@ -115,4 +115,26 @@ test('the doctor wants the Chromium build the pinned Playwright MCP needs, not a
   fs.mkdirSync(path.join(browsers, `chromium-${CHROMIUM_REVISION}`));
   assert.match(line(), /^ ok /);
   fs.rmSync(home, { recursive: true, force: true });
+});
+
+test('a browser that is installed but cannot start (missing system libraries) is found before launch',
+  { skip: process.platform !== 'linux' && 'the check runs on Linux' }, () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lfl-browsers-'));
+    const bin = path.join(root, `chromium-${CHROMIUM_REVISION}`, 'chrome-linux64', 'chrome');
+    fs.mkdirSync(path.dirname(bin), { recursive: true });
+    fs.writeFileSync(bin, '#!/bin/sh\necho "chrome: error while loading shared libraries: libnspr4.so: cannot open shared object file" >&2\nexit 127\n', { mode: 0o755 });
+    assert.match(browserStartProblem([root]), /chrome does not start: .*libnspr4\.so/);
+    fs.writeFileSync(bin, '#!/bin/sh\necho "Google Chrome for Testing 151.0"\n', { mode: 0o755 });
+    assert.equal(browserStartProblem([root]), '');
+    assert.equal(browserStartProblem([path.join(root, 'none')]), '');  // not installed is the other check's business
+    assert.match(BROWSER_DEPS, /playwright install-deps chromium$/);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+test("npx's PATH gets the running node's folder at the end, so a node started by its full path finds npx", () => {
+  const sep = path.delimiter;
+  assert.deepEqual(childPath({ PATH: ['/a', '/b'].join(sep) }, '/opt/node/bin/node'), { key: 'PATH', value: ['/a', '/b', '/opt/node/bin'].join(sep) });
+  assert.deepEqual(childPath({ PATH: ['/opt/node/bin', '/a'].join(sep) }, '/opt/node/bin/node'), { key: 'PATH', value: ['/opt/node/bin', '/a'].join(sep) });
+  assert.deepEqual(childPath({ Path: 'C:\\x' }, '/n/node'), { key: 'Path', value: ['C:\\x', '/n'].join(sep) });
+  assert.deepEqual(childPath({}, '/n/node'), { key: 'PATH', value: '/n' });
 });

@@ -203,6 +203,8 @@ class Zotero(Base):
             ({"ZOTERO_API_KEY": "xx**", "ZOTERO_LIBRARY_TYPE": "user"}, "files go to Zotero Storage (the quota applies)"),
             (dict(webdav, ZOTERO_LIBRARY_TYPE="group"), "a group library cannot use WebDAV"),
             (dict(webdav, ZOTERO_LOCAL="true", ZOTERO_LOCAL_API_KEY="xx**"), "files go to the running Zotero desktop"),
+            # what `zotero-mcp setup` writes by default (0.17.4): local mode, before authorize-local
+            ({"ZOTERO_LOCAL": "true"}, "nothing can be written yet"),
         ]
         for env, expected in cases:
             os.environ["FAKE_CONFIG"] = json.dumps(env)

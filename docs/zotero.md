@@ -8,7 +8,7 @@ reading, citing and annotating your library is Zotero MCP's.
 ## Set up
 
 Run `/lit-fetch-ladder:zotero setup` in the folder where you use the plugin. The agent installs Zotero
-MCP (0.17.4 or later), asks you to run `zotero-mcp setup` in your own terminal, and then installs Zotero
+MCP (0.17.4 or later), asks you to run its setup in your own terminal, and then installs Zotero
 MCP's `zotero-cli` skill in the folder's `.claude/skills/`. After a restart of Claude Code, the agent
 there can file batches and also search, read, cite and annotate your library. If you want semantic
 search over the full text of your papers, say so when asked: it adds Zotero MCP's `semantic` extra, a
@@ -16,14 +16,17 @@ download of a few GB, and `zotero-mcp update-db --fulltext` builds the index. By
 
 ```
 uv tool install "zotero-mcp-server>=0.17.4"    # or "zotero-mcp-server[semantic]>=0.17.4"; or pipx
-zotero-mcp setup                                # your API key and library ID, or WebDAV settings
+zotero-mcp setup --no-local --no-claude        # web route: API key, library ID, WebDAV settings
 zotero-mcp install-skill --target claude        # in the folder where you use the plugin
 ```
 
-Zotero MCP needs Python 3.10+. It writes to the running Zotero desktop or through the web API. The
-desktop route needs Zotero 10 or newer, `zotero-mcp authorize-local`, and **Always Allow** in the dialog
-Zotero shows. The web route works with any Zotero version and needs an API key and your library ID. Use
-your personal library, not a group library. Filing works with Zotero MCP 0.15 or later. If you sync files
+Zotero MCP needs Python 3.10+. It writes through the web API or to the running Zotero desktop. The web
+route, `--no-local`, works with any Zotero version and from a container, and asks for an API key, your
+library ID and WebDAV settings. Without `--no-local`, setup writes the desktop route, which can read but
+not write until you run `zotero-mcp authorize-local` and choose **Always Allow** in the dialog Zotero
+shows (Zotero 10 or newer, on the same machine). `--no-claude` skips the Claude Desktop configuration,
+which Claude Code does not use. The first line of a filing, and of `--dry-run`, says where files will go,
+or that nothing can be written yet. Use your personal library, not a group library. Filing works with Zotero MCP 0.15 or later. If you sync files
 over WebDAV, use 0.17.4 or later: earlier versions upload to Zotero Storage first (before 0.16) or give
 up on a WebDAV upload after 10 seconds. `/lit-fetch-ladder:doctor` reports whether `zotero-cli` is found.
 
