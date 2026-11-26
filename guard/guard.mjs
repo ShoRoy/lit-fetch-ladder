@@ -493,6 +493,9 @@ const FILE_TOOLS = new Set(['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit'
 // flags may stand between a command and its subcommand. An expanded, encoded or staged command
 // stays a documented limit of a pattern match.
 const ZOTERO_CLI_RE = /\b(?:zotero-cli(?:\.exe)?|python3?(?:\.\d+)?(?:\s+-\w+)*\s+-m\s+zotero_mcp\.cli_standalone)(?:\s+(?:-\w+|--[\w-]*))*\s+\$?(?:delete|edit|batch|duplicates\s[^|;&\n]*\bmerge|library\s[^|;&\n]*\b(?:switch|reset)|tags\s[^|;&\n]*--rem\w*|(?:notes|n|annotations|ann)(?:\s+-[-\w]+)*\s+(?:update|delete)|(?:annotations|ann)\s[^|;&\n]*\bbatch\b[^|;&\n]*\breplace|(?:collections|coll)(?:\s+-[-\w]+)*\s+(?:update|manage))\b/i;
+// zotero-cli config --show-secrets (zotero-mcp 0.17) prints the API key and the WebDAV password; argparse also takes
+// any prefix of the flag down to --s.
+const ZOTERO_SECRETS_RE = /\b(?:zotero-cli(?:\.exe)?|python3?(?:\.\d+)?(?:\s+-\w+)*\s+-m\s+zotero_mcp\.cli_standalone)(?:\s+(?:-\w+|--[\w-]*))*\s+config\b[^|;&\n]*\s--s[\w-]*/i;
 // The plugin's own undo: `lfl zotero --trash KEY...` moves a listed set in one command, so one ask covers the list.
 const LFL_TRASH_RE = /\b(?:lfl(?:\.py)?|lit_fetch_ladder(?:\.cli)?)\b[^|;&\n]*\bzotero\b[^|;&\n]*--trash\b/i;
 // Inline code against the plugin's or zotero-mcp's modules, which filing never needs.
@@ -515,6 +518,7 @@ function zoteroText(command) {
 function judgeZoteroShell(command) {
   const c = zoteroText(command);
   if (ZOTERO_CLI_RE.test(c)) return out('ask', `this zotero-cli command ${ZOTERO_ASK}`);
+  if (ZOTERO_SECRETS_RE.test(c)) return out('ask', 'this prints your Zotero API key and WebDAV password into the conversation; filing a batch never needs them. Confirm it is part of what you asked for.');
   if (LFL_TRASH_RE.test(c)) return out('ask', 'this command moves the listed Zotero items to the trash, one confirmation for the whole list; filing a batch never needs it. Confirm the list is what you asked for.');
   if (ZOTERO_CODE_RE.test(c)) return out('ask', 'this runs code against the Zotero modules directly, which can do anything to your library; filing a batch never needs it. Confirm it is part of what you asked for.');
   if (ZOTERO_ENV_RE.test(c)) return out('ask', 'this sets Zotero credentials or the target library on the command line, which would send every write elsewhere; filing a batch never needs it. Confirm it is part of what you asked for.');

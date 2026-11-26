@@ -5,7 +5,7 @@
 - Each fetch starts by checking for a saved library login (`doctor.mjs --login`, no network, never the
   file's contents). When a proxy is set and there is none, or it is more than 12 hours old, the agent
   asks whether to sign in first with `/lit-fetch-ladder:login` or to fetch without the library.
-- `/lit-fetch-ladder:zotero setup` installs Zotero MCP (0.17.3 or later, with semantic search if you
+- `/lit-fetch-ladder:zotero setup` installs Zotero MCP (0.17.4 or later, with semantic search if you
   want it), has you run `zotero-mcp setup`, and installs Zotero MCP's `zotero-cli` skill in the folder,
   so fetching, filing and working with the library run as one pipeline.
 - More publishers' own platforms where a click in the library browser runs without asking inside an
@@ -25,6 +25,12 @@
   not as titles to search for.
 - `lfl discover --refs-of` returns up to 200 references instead of the first 15.
 - The doctor checks for the Chromium build the pinned Playwright MCP needs, not any Chromium.
+- The sign-in checks that a display answers before it opens the window, not only that one is named.
+  When `DISPLAY` is set but no X server answers (VS Code's forwarding on Windows), the window opens on
+  Wayland. When no display answers, or the browser stops at once, `/lit-fetch-ladder:login` says NOT
+  OPENED and why, instead of OPENING. The doctor runs the same check.
+- Guard: `zotero-cli config --show-secrets` (Zotero MCP 0.17), which prints the API key and WebDAV
+  password, asks first.
 - Fewer prompts in the library browser. The plugin ships `guard/known-sites.json`: sites publishers are
   known to redirect to (Elsevier's link site to sciencedirect.com and its file host), which a batch
   that includes the publisher lists in its one approval prompt, and sites where a click in the library

@@ -37,9 +37,7 @@ takes `--keep-data` to keep it. Fetched papers stay in your project's `lit-fetch
 
 ## Signing in from a container
 
-The sign-in window needs a display. Check with `echo $DISPLAY $WAYLAND_DISPLAY`. If neither is set, the
-window cannot open, and a variable that is set does not prove the display works (see
-[If the window does not open](#if-the-window-does-not-open)).
+The sign-in window needs a display, and `/lit-fetch-ladder:doctor` checks that one answers.
 
 - **VS Code Dev Containers** can forward the host display into the container. On Windows with WSL2 this
   needed no configuration.
@@ -56,13 +54,7 @@ window cannot open, and a variable that is set does not prove the display works 
 
 ### If the window does not open
 
-If no window appears, or the doctor still shows the old login, read `login.log` in the plugin's data
-directory. The command reports the window as opening even when the browser exits at once.
-
-If the log says "Missing X server or $DISPLAY", `DISPLAY` is set but no X display answers on it. This was
-seen with VS Code's forwarding on Windows, where Wayland still worked, so run the terminal command that
-`/lit-fetch-ladder:login` shows with `XDG_SESSION_TYPE=wayland` in front:
-
-```
-XDG_SESSION_TYPE=wayland node "<plugin root>/scripts/login.mjs" --data "<plugin data directory>"
-```
+Before it opens the window, the sign-in checks that a display answers, not only that one is named. When
+`DISPLAY` is set but no X server answers on it, as seen with VS Code's forwarding on Windows, the window
+opens on Wayland instead. When no display answers, or the browser stops at once, the command says NOT
+OPENED and why. If a window still does not appear, read `login.log` in the plugin's data directory.

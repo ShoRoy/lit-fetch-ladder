@@ -50,4 +50,4 @@ jobs:
       - name: Validate the plugin (manifests, hooks, MCP servers, skills)
         # Pinned, because the validator's rules change between releases. Needs Node 22+.
         if: matrix.newest
-        run: npx --yes @anthropic-ai/claude-code@2.1.331 plugin validate --strict .
+        run: npx --yes @anthropic-ai/claude-code@2.1.332 plugin validate --strict .

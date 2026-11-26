@@ -12,11 +12,11 @@ doctor reports whether it is found. If it is missing, offer the setup below.
 
 ## Set up (`setup`, or when the user asks to set up Zotero)
 
-1. If `zotero-mcp version` answers with 0.17.3 or later, go to step 3. If it is older, run
+1. If `zotero-mcp version` answers with 0.17.4 or later, go to step 3. If it is older, run
    `zotero-mcp update` with the user's go-ahead.
 2. Ask whether they want semantic search over the full text of their library. It needs Zotero MCP's
    `semantic` extra, a download of a few GB (PyTorch and an embedding model). Install with
-   `uv tool install "zotero-mcp-server>=0.17.3"`, or `"zotero-mcp-server[semantic]>=0.17.3"` for
+   `uv tool install "zotero-mcp-server>=0.17.4"`, or `"zotero-mcp-server[semantic]>=0.17.4"` for
    semantic search, or the same with `pipx install` if `uv` is missing. Zotero MCP needs Python 3.10+.
 3. Ask the user to run `zotero-mcp setup` in their own terminal. It asks for their Zotero API key and
    library ID, which stay theirs: never run it yourself, and never ask for the key. On Zotero 10 or newer

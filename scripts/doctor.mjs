@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { CHROME_MAJOR, CHROMIUM_REVISION, PLAYWRIGHT_MCP, SESSION_FILE, argValue, defaultDataDir, pluginOptions, proxySuffix, signInUrl } from './common.mjs';
-import { hasDisplay } from './login.mjs';
+import { displayPlan } from './login.mjs';
 
 const rows = [];
 const check = (ok, label, hint = '') => rows.push(`${ok ? ' ok ' : 'FIX '} ${label}${!ok && hint ? `\n       -> ${hint}` : ''}`);
@@ -97,7 +97,9 @@ if (!suffix) {
       : 'no plugin data directory found; pass --data <dir> (Claude Code sets it when it runs the doctor)');
   }
   if (data) note(`plugin data: ${data}`);
-  check(hasDisplay(), 'a display for the sign-in window', 'see "Signing in from a container" in docs/sign-in.md');
+  const display = await displayPlan();
+  check(display.ok, `a display for the sign-in window${display.note ? `: ${display.note}` : ''}`,
+    `${display.reason}; see "Signing in from a container" in docs/sign-in.md`);
 }
 
 console.log(`lit-fetch-ladder doctor\n${rows.join('\n')}`);

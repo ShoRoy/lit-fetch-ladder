@@ -8,14 +8,14 @@ reading, citing and annotating your library is Zotero MCP's.
 ## Set up
 
 Run `/lit-fetch-ladder:zotero setup` in the folder where you use the plugin. The agent installs Zotero
-MCP (0.17.3 or later), asks you to run `zotero-mcp setup` in your own terminal, and then installs Zotero
+MCP (0.17.4 or later), asks you to run `zotero-mcp setup` in your own terminal, and then installs Zotero
 MCP's `zotero-cli` skill in the folder's `.claude/skills/`. After a restart of Claude Code, the agent
 there can file batches and also search, read, cite and annotate your library. If you want semantic
 search over the full text of your papers, say so when asked: it adds Zotero MCP's `semantic` extra, a
 download of a few GB, and `zotero-mcp update-db --fulltext` builds the index. By hand, the same is:
 
 ```
-uv tool install "zotero-mcp-server>=0.17.3"    # or "zotero-mcp-server[semantic]>=0.17.3"; or pipx
+uv tool install "zotero-mcp-server>=0.17.4"    # or "zotero-mcp-server[semantic]>=0.17.4"; or pipx
 zotero-mcp setup                                # your API key and library ID, or WebDAV settings
 zotero-mcp install-skill --target claude        # in the folder where you use the plugin
 ```
@@ -23,9 +23,9 @@ zotero-mcp install-skill --target claude        # in the folder where you use th
 Zotero MCP needs Python 3.10+. It writes to the running Zotero desktop or through the web API. The
 desktop route needs Zotero 10 or newer, `zotero-mcp authorize-local`, and **Always Allow** in the dialog
 Zotero shows. The web route works with any Zotero version and needs an API key and your library ID. Use
-your personal library, not a group library. Filing works with Zotero MCP 0.15 or later, or 0.16 or later
-if you sync files over WebDAV, since earlier versions upload to Zotero Storage first and stop when its
-quota is full. `/lit-fetch-ladder:doctor` reports whether `zotero-cli` is found.
+your personal library, not a group library. Filing works with Zotero MCP 0.15 or later. If you sync files
+over WebDAV, use 0.17.4 or later: earlier versions upload to Zotero Storage first (before 0.16) or give
+up on a WebDAV upload after 10 seconds. `/lit-fetch-ladder:doctor` reports whether `zotero-cli` is found.
 
 ## File a batch
 
