@@ -143,6 +143,19 @@ def matches(path, title, author=None):
     return by_author and bool(longer) and sum(w in set(words) for w in longer) >= 0.6 * len(longer)
 
 
+# The PDF a landing page names for itself (Highwire tags, set by most repositories and publishers).
+CITATION_PDF = re.compile(r"<meta\s[^>]*?(?:name=[\"']citation_pdf_url[\"'][^>]*?content=[\"']([^\"']+)"
+                          r"|content=[\"']([^\"']+)[\"'][^>]*?name=[\"']citation_pdf_url[\"'])", re.IGNORECASE)
+
+
+def pdf_from_landing(url):
+    """The PDF an open copy's landing page names in its citation_pdf_url tag, or None."""
+    page, err = net.get(url, want="bytes")
+    m = CITATION_PDF.search(page[:500000].decode("utf-8", "ignore")) if page and not err else None
+    href = m and (m.group(1) or m.group(2))
+    return urllib.parse.urljoin(url, href.strip()) if href else None
+
+
 def resolve(email, doi=None, title=None, download_dir=None):
     """Find (and optionally download) an open-access copy. Returns (code, result)."""
     candidates = None
@@ -171,8 +184,21 @@ def resolve(email, doi=None, title=None, download_dir=None):
         # paper, is deleted and the next candidate tried.
         result["downloaded"] = {"path": None, "warning": "no direct PDF link among open copies; landing pages only"}
         warnings = []
-        for c in [c for c in locs if c["pdf"]][:TRIES]:
-            path, warn = download(c["pdf"], download_dir, net.file_stem(doi))
+
+        def pdf_urls():
+            seen = set()
+            for c in [c for c in locs if c["pdf"]][:TRIES]:
+                seen.add(c["pdf"])
+                yield c["pdf"]
+            # No direct link was the paper: a landing page often names its PDF (HAL, repositories).
+            for c in [c for c in locs if c["landing"]][:TRIES]:
+                pdf = pdf_from_landing(c["landing"])
+                if pdf and pdf not in seen:
+                    seen.add(pdf)
+                    yield pdf
+
+        for url in pdf_urls():
+            path, warn = download(url, download_dir, net.file_stem(doi))
             ok = matches(path, meta["title"], meta["author"]) if path and not warn else None
             if ok is False:
                 warn = "open copy did not match the paper"
@@ -181,7 +207,7 @@ def resolve(email, doi=None, title=None, download_dir=None):
                 path = None
             if warn and warn not in warnings:
                 warnings.append(warn)
-            result["downloaded"] = {"path": path, "url": c["pdf"], "verified": ok,
+            result["downloaded"] = {"path": path, "url": url, "verified": ok,
                                     "warning": "; ".join(warnings) if not path else None}
             if path:
                 break

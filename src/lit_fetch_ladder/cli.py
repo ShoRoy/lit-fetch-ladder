@@ -168,6 +168,13 @@ def main(argv=None):
            "suffix": proxify.suffix_from(a.proxy_suffix) if mode == "ezproxy-host" else None}
     manifest, mpath = fetch.run(ids, a.batch, a.base, cfg, refresh=a.refresh)
     print(fetch.report(manifest, mpath, a.pages_per_paper))
+    seen, repeated = set(), []  # inputs naming a paper an earlier input already named, merged into one row
+    for raw in ids:
+        key = net.norm_doi(raw) if fetch.is_doi(raw) else raw
+        (repeated.append(raw) if key in seen else seen.add(key))
+    if repeated:
+        print("\n%d input(s) named a paper already in this request and were merged: %s"
+              % (len(repeated), ", ".join(repeated[:8]) + (", ..." if len(repeated) > 8 else "")))
     return 0
 
 

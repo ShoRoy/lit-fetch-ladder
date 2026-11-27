@@ -30,16 +30,17 @@ commands in your own terminal. Weigh both when you choose the install scope.
 |---|---|
 | run code in the browser, read cookies or storage, read raw request headers | denied in both browsers (`browser_evaluate`, `browser_run_code_unsafe`, cookie and storage tools, `browser_network_request`, `browser_file_upload`) |
 | open `file://` or any non-http(s) address | denied |
-| read the saved login | denied for the file tools, for shell commands that name it, and for shell commands that take the plugin's data directory as a whole; the guard also refuses it as a file for Zotero MCP's add and attach tools |
+| read the saved login | denied for the file tools (also a search from a folder above it, or through a symlinked folder), for shell commands that name it, and for shell commands that take the plugin's data directory as a whole or change into it; the guard also refuses it as a file for Zotero MCP's add and attach tools |
+| change the guard itself | the file tools cannot write the plugin's guard, hooks or server files, and shell commands that name them are refused |
 | add papers to the batch | a batch that grows needs your approval again, and the prompt names the new papers and sites |
 | open another site in the library browser | you are asked, and the site joins the batch only if you say yes |
 | redirect the library browser to a site of its choosing | the site it lands on is not trusted, so opening it again asks, and the prompt names the redirect |
 | reuse a site approved in an earlier batch | allowed only in batches that include the site it was approved from, and listed in their approval prompt; forget it with `/lit-fetch-ladder:sites` |
-| fetch a proxied address with `curl` or WebFetch, outside the counted browser | denied |
+| fetch a proxied address with `curl` or WebFetch, outside the counted browser | denied, in any letter case and with or without a trailing dot |
 | loop, by navigating or by clicking through pages | the batch's page budget, 20 page loads per burst, 60 per 24 hours; a click or key press in the library browser counts when it opens a page or a tab |
-| download a whole issue with one click or page load | the batch stops when one action starts more than one download or an archive, and the next page load asks you, with the reason |
+| download a whole issue with one click or page load | the batch stops when one action starts more than one download or an archive, and the next page load asks you, with the reason, also when the batch is renamed |
 | make you run the sign-in, or run it itself | the sign-in starts from your `/lit-fetch-ladder:login`, which the agent cannot invoke; shell commands that name the sign-in script are refused |
-| change your Zotero library beyond filing, through `zotero-cli`, Zotero MCP's own tools or `lfl zotero --trash` (trash, merge, edit, delete a collection, copy items to or switch libraries, set Zotero credentials or the target library on a command line, run code against the Zotero modules, run `zotero-mcp setup` or `authorize-local`) | you are asked, once per command, and once for the whole list with `lfl zotero --trash`; filing only adds, attaches and annotates |
+| change your Zotero library beyond filing, through `zotero-cli`, Zotero MCP's own tools or `lfl zotero --trash` (trash, merge, edit, delete a collection, copy items to or switch libraries, set Zotero credentials, the target library or where requests go on a command line, run code against the Zotero modules, run `zotero-mcp setup` or `authorize-local`) | you are asked, once per command, and once for the whole list with `lfl zotero --trash`; filing only adds, attaches and annotates |
 
 In the browser without a login, page loads, snapshots, screenshots, waits and clicks run without a
 prompt. In the library browser, page loads and page interactions need an approved batch. Page loads
@@ -59,8 +60,8 @@ tells a restricted item from any other.
 - On a campus network or library VPN there is no proxy address to check, so the browser without a login,
   `curl` and WebFetch reach what your library subscribes to with no approval and no cap. Only the fetch
   skill's procedure keeps them to open-access pages.
-- The shell checks on the saved login, the sign-in script and the Zotero commands match the command's
-  text. A command that splits, quotes, expands, encodes or stages a path or name can slip past them, and
+- The shell checks on the saved login, the sign-in script, proxied addresses, the guard's own files and
+  the Zotero commands match the command's text. A command that splits, quotes, expands, encodes or stages a path or name can slip past them, and
   such a command could also start the sign-in. Sign in only to a window you opened with
   `/lit-fetch-ladder:login`. The file tools are checked by resolved path.
 - A shell command that takes the plugin's data directory as a whole (`grep -r`, `tar`, `cp -r`, `cd` or a
@@ -73,9 +74,12 @@ tells a restricted item from any other.
   another site, as a redirect can, or answer a bot check, and only the fetch skill's rules hold the
   agent back there.
 - The bulk-download stop acts after the call, so the downloads one action started are already under way.
+  It sees only the downloads reported in that call's result, so downloads in a pop-up window, or ones
+  that start after the result, do not stop the batch.
 - The sites shipped in `guard/known-sites.json` are trusted without an earlier approval of yours. The
   batch prompt lists the known redirects, and `/lit-fetch-ladder:sites` lists the click sites.
-- A page that loads another page by itself, with no navigation or click from the agent, is not counted.
+- A page that loads another page by itself, with no navigation or click from the agent, is not counted,
+  and a click there is judged as if on the page before.
 - More papers from a publisher already in the batch are bounded by the page budget, not prevented.
 - A site approved by mistake stays allowed in batches that include the site it follows, until you forget
   it with `/lit-fetch-ladder:sites`.

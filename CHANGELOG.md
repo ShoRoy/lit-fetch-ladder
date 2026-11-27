@@ -1,9 +1,33 @@
 # Changelog
 
-## Unreleased
+## 0.2.5
 
 - While the browser cannot start, the doctor and `--preflight` say to sign in once the browser starts,
   instead of pointing at a sign-in that cannot open a window yet.
+- A bot check on an open-access copy (rung 2) ends only that route; a paper with a library route still
+  goes on to the library browser, the user's own access. A bot check on the library route still stops
+  the paper. The fetch skill also says that the guard's approval prompt is the batch approval, and
+  that the agent waits for a chat reply only after the login question. Both came from a run where an
+  open-access host's automatic check had stopped a paper the library could open.
+- Rung 1 reads the PDF a landing page names for itself (`citation_pdf_url`) when no direct link
+  among the open copies works, and checks it against the paper like any other. A paper whose only
+  open copy is a repository landing page (HAL, for example) now comes back at rung 1, without a
+  browser or the library.
+- The batch report lists open copies on a landing page (rung 2) before the papers staged for the
+  library, and says when inputs named the same paper and were merged into one row.
+- The browse and library servers exit 0 when Claude Code shuts them down.
+- The README's version badge is a fixed one, checked by a test against plugin.json; the live badge
+  from shields.io often failed to load on GitHub.
+- Guard, from a red-team pass before release: a file search from `/` or with no path above the data
+  folder is refused; a page title can no longer pass for the page's address; downloads with one file
+  name count as several; a manifest or batch pointer that is not a plain file fails closed instead of
+  hanging; a write through a symlinked folder into the guard state is refused; `ZOTERO_API_URL`,
+  `ZOTERO_LOCAL_PORT`, `+=` assignments, `python -m zotero_mcp setup`, other ways of importing
+  `zotero_mcp` and `zotero-cli` run by `xargs` ask; `navigate_back` in the library browser asks;
+  proxied addresses are refused in any letter case, bare or with a trailing dot; a stopped batch stays
+  stopped when renamed, and every approval covering it stops; the data-folder rule also covers `/./`,
+  `cd` and `tar -C` into it and variable forms naming `secret` or `state`. The guard also refuses the
+  agent's edits to its own guard, hooks and server files.
 - Docs: the Quick start is shorter again. The requirements table keeps one column of reasons, and what
   to do when the browsers do not start (missing libraries, Node installed after the plugin) moved to
   Fetching papers.

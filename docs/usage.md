@@ -86,10 +86,11 @@ The doctor checks that the file is in place. Its location on macOS and Windows h
 
 ## When a paper does not come back
 
-Some publishers put a bot check in front of their articles or files, and it can come and go from day to
-day. The agent stops at it and does not try to get past it. Open the paper yourself through your
-library, and do not retry it in a loop, since repeated attempts are what bot checks and library proxies
-watch for. The "publisher does not download" issue form collects such sites.
+Some sites put a bot check in front of their articles or files, and it can come and go from day to day.
+The agent never tries to get past one. A check on an open-access copy only ends that route, and the
+paper still goes to your library if it needs it. A check on the library route stops the paper: open it
+yourself through your library, and do not retry it in a loop, since repeated attempts are what bot checks
+and library proxies watch for. The "publisher does not download" issue form collects such sites.
 
 Each library pays for its own set of journals. A paper your library does not cover shows a purchase or
 "get access" page, and the agent marks it `ABSTRACT_ONLY` with a note.

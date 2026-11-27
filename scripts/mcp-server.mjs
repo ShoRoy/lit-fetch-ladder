@@ -33,5 +33,7 @@ if (profile === 'library' && suffix) args.push('--storage-state', path.join(data
 // Run the server inside its download folder: a snapshot or screenshot the agent saves under a short
 // file name lands there, never loose in the user's project.
 const child = npx(args, { cwd: outDir });
-for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => child.kill(sig));
-child.on('exit', (code, sig) => process.exit(code ?? (sig ? 1 : 0)));
+// A signal passed on to the server is a normal shutdown: exit 0 when the server ends by it.
+let forwarded = null;
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => { forwarded = sig; child.kill(sig); });
+child.on('exit', (code, sig) => process.exit(code ?? (sig && sig !== forwarded ? 1 : 0)));

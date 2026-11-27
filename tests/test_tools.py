@@ -181,6 +181,16 @@ class Driver(Base):
         self.assertIn("1 paper(s) staged for the library browser (budget up to 5 page loads)", text)
 
 
+    def test_report_lists_open_landing_pages_before_the_library(self):
+        manifest, mpath = self.run_batch(["10.1/landing", "10.1/paywalled"])
+        text = fetch.report(manifest, mpath)
+        landing = next(i for i in manifest["items"] if i["doi"] == "10.1/landing")
+        self.assertIn("1 paper(s) have an open copy on a landing page, for the browser without a login (rung 2):", text)
+        self.assertIn("  - 10.1/landing -> %s" % landing["url"], text)
+        self.assertLess(text.index("open copy on a landing page"), text.index("staged for the library browser"))
+        self.assertIn("10.1/landing -> %s (if rung 2 does not get it)" % landing["auth_url"], text)
+
+
 class Inputs(unittest.TestCase):
     def test_doi_links_and_arxiv_ids_are_read_as_dois_not_titles(self):
         for raw in ("10.48550/arXiv.1706.03762", "arXiv:1706.03762", "arxiv: 1706.03762v5", "1706.03762",
@@ -324,7 +334,7 @@ class Privacy(unittest.TestCase):
         self.assertTrue({"repo.example", "doi.org", "api.openalex.org", "api.unpaywall.org"} <= hosts, hosts)
 
     def test_user_agent_names_the_tool_only(self):
-        self.assertEqual(net.USER_AGENT, "lit-fetch-ladder/0.2.4")
+        self.assertEqual(net.USER_AGENT, "lit-fetch-ladder/0.2.5")
 
 
 class Settings(unittest.TestCase):
@@ -360,6 +370,15 @@ class Cli(unittest.TestCase):
                                               "LFL_PROXY_SUFFIX": "https://login.proxy.example.edu/login?url=x"}):
                 cli.main(["fetch", "10.1/x", "--batch", "b"])
         self.assertEqual([(c["mode"], c["suffix"]) for c in seen], [("none", None), ("ezproxy-host", SUFFIX)])
+
+    def test_inputs_that_name_the_same_paper_are_merged_and_said_so(self):
+        import io
+        with mock.patch.object(fetch, "run", return_value=({"batch": "b", "items": []}, "m")), \
+                mock.patch.object(fetch, "report", return_value="report"), \
+                mock.patch.dict(os.environ, {"LFL_EMAIL": "me@example.org", "LFL_PROXY_SUFFIX": ""}), \
+                mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+            cli.main(["fetch", "10.48550/arXiv.1706.03762", "1706.03762", "10.1/x", "--batch", "b"])
+        self.assertIn("1 input(s) named a paper already in this request and were merged: 1706.03762", out.getvalue())
 
     def test_references_are_not_cut_to_the_search_limit(self):
         with mock.patch.object(discover, "refs_of", return_value=[]) as refs, \
@@ -476,6 +495,27 @@ class OpenCopy(unittest.TestCase):
         self.assertEqual(sorted(os.listdir(self.tmp)), ["10.1_a.pdf", "10.1_b.pdf"])
         with open(pa, "rb") as fa, open(pb, "rb") as fb:
             self.assertEqual((fa.read(), fb.read()), (ATTENTION_PDF, OTHER_PDF))
+
+    def test_a_landing_page_that_names_its_pdf_is_read_when_no_direct_link_works(self):
+        # Unpaywall gives HAL's landing page only; the page names its PDF in citation_pdf_url.
+        self.openalex = dict(ATTENTION_OPENALEX, locations=[
+            {"is_oa": True, "pdf_url": None, "landing_page_url": "https://hal.example/hal-1", "version": "acceptedVersion",
+             "source": {"display_name": "HAL"}}], best_oa_location=None)
+        page = b'<html><head><meta content="/hal-1/document" name="citation_pdf_url"></head></html>'
+        self.web = {"https://hal.example/hal-1": page, "https://hal.example/hal-1/document": ATTENTION_PDF}
+        code, res = resolve.resolve("me@example.org", doi="10.1/attention", download_dir=self.tmp)
+        self.assertEqual((res["downloaded"]["url"], res["downloaded"]["verified"]),
+                         ("https://hal.example/hal-1/document", True))
+        self.assertEqual(os.listdir(self.tmp), ["10.1_attention.pdf"])
+
+    def test_landing_pages_are_not_fetched_when_a_direct_link_works(self):
+        self.openalex = dict(ATTENTION_OPENALEX, locations=[
+            {"is_oa": True, "pdf_url": "https://repo.example/right.pdf", "landing_page_url": "https://repo.example/abs",
+             "version": "acceptedVersion", "source": {"display_name": "Repo"}}], best_oa_location=None)
+        self.web = {"https://repo.example/right.pdf": ATTENTION_PDF}  # the landing page would 404
+        with mock.patch.object(resolve, "pdf_from_landing", side_effect=AssertionError("fetched a landing page")):
+            code, res = resolve.resolve("me@example.org", doi="10.1/attention", download_dir=self.tmp)
+        self.assertEqual(res["downloaded"]["verified"], True)
 
     def test_when_no_copy_is_the_paper_the_row_is_not_fetched(self):
         self.web = {"https://arxiv.org/pdf/1706.03762": OTHER_PDF}

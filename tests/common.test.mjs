@@ -182,3 +182,10 @@ test('doctor --preflight names each missing prerequisite with its fix, then the 
   }
   fs.rmSync(home, { recursive: true, force: true });
 });
+
+test("the README's version badge names the plugin's version", () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const version = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin', 'plugin.json'), 'utf8')).version;
+  const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+  assert.match(readme, new RegExp(`img\\.shields\\.io/badge/version-${version.replace(/\./g, '\\.')}-`), 'bump the badge with the version');
+});

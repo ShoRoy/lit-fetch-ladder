@@ -100,6 +100,8 @@ export function config() {
     burst: clampInt(opt('cap_burst', MAX_BURST), 1, MAX_BURST, MAX_BURST),
     daily: clampInt(opt('cap_daily', MAX_DAILY), 1, MAX_DAILY, MAX_DAILY),
     perPaper: clampInt(opt('pages_per_paper', 5), 1, MAX_PER_PAPER, 5),
+    // The plugin's own folder: where Claude Code says it is, else the folder this guard lives in.
+    root: process.env.CLAUDE_PLUGIN_ROOT || path.dirname(path.dirname(fileURLToPath(import.meta.url))),
     secretDir: data ? path.join(data, 'secret') : '',
     stateDir: data ? path.join(data, 'state') : '',
     sessionFile: data ? path.join(data, 'secret', 'library-state.json') : '',
@@ -112,7 +114,8 @@ export function config() {
 function hostOf(url) {
   try {
     const u = new URL(url);
-    return { scheme: u.protocol.replace(/:$/, ''), host: u.hostname.toLowerCase(), url: u };
+    // A trailing dot names the same host ("proxy.example." is "proxy.example").
+    return { scheme: u.protocol.replace(/:$/, ''), host: u.hostname.toLowerCase().replace(/\.$/, ''), url: u };
   } catch {
     return null;
   }
@@ -158,7 +161,12 @@ export function siteOf(host) {
 
 // ---------------------------------------------------------------- state
 
+// Only a plain file of reasonable size: the agent can write the manifest and the batch pointer,
+// and a FIFO or a huge file there would hang the guard past its hook timeout, which fails open.
+const MAX_JSON = 20 * 1024 * 1024;
 function readJson(file) {
+  const st = fs.statSync(file);
+  if (!st.isFile() || st.size > MAX_JSON) throw new Error(`${path.basename(file)} is not a plain JSON file`);
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
@@ -374,6 +382,8 @@ function judgeLibraryNavigation(cfg, tool, input, url, now, key) {
     } else {
       approval.used += 1;
       if (url) decision = judgeSite(cfg, st, url, approval, batch, key, now);
+      // Back goes to a page the call does not name, perhaps a redirect's landing the user never approved.
+      else if (tool === 'navigate_back') decision = out('ask', 'navigate_back in the logged-in browser goes to a page this call does not name; navigate to the address instead.');
     }
 
     st.loads.push(now);
@@ -422,7 +432,9 @@ function judgeLibraryInteraction(cfg, tool, now, key) {
 // listing every site the logged-in browser will open and what is new. The page load
 // itself must be on one of those sites, or the user would approve a prompt that does not name it.
 function askForBatch(cfg, st, batch, key, now, url) {
-  const prev = [...st.approvals].reverse().find((a) => a.batch === batch.name);
+  // A stopped approval over any of these papers stays in charge, whatever the batch is now called.
+  const stopped = [...st.approvals].reverse().find((a) => a.stopped && a.targets.some((t) => batch.targets.includes(t)));
+  const prev = stopped || [...st.approvals].reverse().find((a) => a.batch === batch.name);
   const newTargets = prev ? batch.targets.filter((t) => !prev.targets.includes(t)) : batch.targets;
   const shown = newTargets.slice(0, 5).map((t) => t.replace(/[^\x21-\x7e]+/g, '_').slice(0, 80));  // DOIs from the manifest
   const roots = [...new Set([...(prev ? prev.sites : []), ...batch.sites.keys()])];
@@ -499,12 +511,12 @@ const ZOTERO_SECRETS_RE = /\b(?:zotero-cli(?:\.exe)?|python3?(?:\.\d+)?(?:\s+-\w
 // The plugin's own undo: `lfl zotero --trash KEY...` moves a listed set in one command, so one ask covers the list.
 const LFL_TRASH_RE = /\b(?:lfl(?:\.py)?|lit_fetch_ladder(?:\.cli)?)\b[^|;&\n]*\bzotero\b[^|;&\n]*--trash\b/i;
 // Inline code against the plugin's or zotero-mcp's modules, which filing never needs.
-const ZOTERO_CODE_RE = /\b(?:from|import)\s+(?:zotero_mcp|lit_fetch_ladder)\b|\blit_fetch_ladder\.zotero\b|\bzotero\.trash\s*\(|\bzotero_mcp\.(?:tools|cli_standalone)\b/i;
-// Credentials or the target library set on the command line would send every write elsewhere;
-// zotero-mcp's setup and its local-write authorisation are the user's to run. The upload timeout
-// changes no destination, so setting it does not ask.
-const ZOTERO_ENV_RE = /\bZOTERO_(?:API_KEY|LIBRARY_ID|LIBRARY_TYPE|LOCAL(?:_API_KEY)?|WEBDAV_(?!TIMEOUT=)\w+)=/i;
-const ZOTERO_MCP_CMD_RE = /\bzotero-mcp\s+(?:setup|authorize-local)\b/i;
+const ZOTERO_CODE_RE = /\b(?:from|import)\s+(?:zotero_mcp|lit_fetch_ladder)\b|\bimport\b[^;\n]*\bzotero_mcp\b|(?:__import__|import_module)\(\s*zotero_mcp|\blit_fetch_ladder\.zotero\b|\bzotero\.trash\s*\(|\bzotero_mcp\.(?:tools|cli_standalone)\b/i;
+// Credentials, the target library or where requests go (the web API's address, the local API's
+// port), set on the command line, would send every write elsewhere; zotero-mcp's setup and its
+// local-write authorisation are the user's to run. The upload timeout changes no destination.
+const ZOTERO_ENV_RE = /\bZOTERO_(?:API_KEY|API_URL|LIBRARY_ID|LIBRARY_TYPE|LOCAL(?:_API_KEY|_PORT)?|WEBDAV_(?!TIMEOUT\b)\w+)\+?=/i;
+const ZOTERO_MCP_CMD_RE = /(?:\bzotero-mcp|-m\s+zotero_mcp(?:\.cli)?)\s+(?:setup|authorize-local)\b/i;
 const ZOTERO_MCP_RE = /^mcp__.+__zotero_(delete_item|delete_collection|delete_annotation|merge_duplicates|batch_update|switch_library|manage_note|update_item|set_item_collections|set_item_parent|update_collection|update_annotation|remove_item_relation|authorize_local_writes|attach_file|add_item|manage_collection|copy_items_between_libraries)$/;
 const ZOTERO_ASK = 'can trash, merge, edit or switch your Zotero library, or authorise local writes to it; filing a fetched batch never needs it. Confirm it is part of what you asked for.';
 const SECRET_DENY = 'the saved library login and the guard state are not readable by the agent.';
@@ -518,6 +530,8 @@ function zoteroText(command) {
 function judgeZoteroShell(command) {
   const c = zoteroText(command);
   if (ZOTERO_CLI_RE.test(c)) return out('ask', `this zotero-cli command ${ZOTERO_ASK}`);
+  // zotero-cli run by xargs takes its command from input the guard cannot see.
+  if (/\bxargs\b[^|;&\n]*(?:\bzotero-cli\b|zotero_mcp\.cli_standalone)/i.test(c)) return out('ask', `zotero-cli run by xargs gets its command from input the guard cannot read, so it ${ZOTERO_ASK}`);
   if (ZOTERO_SECRETS_RE.test(c)) return out('ask', 'this prints your Zotero API key and WebDAV password into the conversation; filing a batch never needs them. Confirm it is part of what you asked for.');
   if (LFL_TRASH_RE.test(c)) return out('ask', 'this command moves the listed Zotero items to the trash, one confirmation for the whole list; filing a batch never needs it. Confirm the list is what you asked for.');
   if (ZOTERO_CODE_RE.test(c)) return out('ask', 'this runs code against the Zotero modules directly, which can do anything to your library; filing a batch never needs it. Confirm it is part of what you asked for.');
@@ -548,11 +562,32 @@ function judgeZotero(cfg, tool, input) {
   return out('ask', `"${tool}" ${ZOTERO_ASK}`);
 }
 
+// A path as it really is: symlinks resolved. For a file not there yet, the nearest folder that is
+// there is resolved and the rest added back, so a symlinked parent cannot hide where a write lands.
 function norm(p) {
   let r = path.resolve(p);
-  try { r = fs.realpathSync(r); } catch { /* may not exist yet */ }
+  try {
+    r = fs.realpathSync(r);
+  } catch {
+    const tail = [];
+    for (let head = r; head !== path.dirname(head);) {
+      tail.unshift(path.basename(head));
+      head = path.dirname(head);
+      try {
+        r = path.join(fs.realpathSync(head), ...tail);
+        break;
+      } catch { /* not there either: go up */ }
+    }
+  }
   return process.platform === 'win32' ? r.toLowerCase() : r;
 }
+
+// Whether path p is root or inside it, by path segments (a search from "/" is above everything).
+function isWithin(p, root) {
+  const r = path.relative(root, p);
+  return r === '' || (r !== '..' && !r.startsWith('..' + path.sep) && !path.isAbsolute(r));
+}
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // A shell command that names the data directory as a whole (or plugins/data above it), or a
 // glob, "." or ".." under it, reaches the saved login with everything else: grep -r, tar, cp -r,
@@ -561,47 +596,70 @@ function norm(p) {
 // <this plugin>, and as $CLAUDE_PLUGIN_DATA. Like the other shell rules, a text match.
 const TOKEN_END = `(?=[\\\\/\\s"';|&()<>]|$)`;
 function namesDataDir(cfg, c) {
-  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const roots = [...new Set([cfg.data, norm(cfg.data)])].filter(Boolean)
-    .map((r) => esc(process.platform === 'win32' ? r.toLowerCase() : r));
+    .map((r) => escRe(process.platform === 'win32' ? r.toLowerCase() : r));
   const stop = `[^\\\\/\\s"';|&()<>]`;
   const spelled = `[^\\s"';|&()<>]*?plugins[\\\\/]+data(?:[\\\\/]+${stop}*${PLUGIN}${stop}*)?`;
-  const env = '\\$\\{?claude_plugin_data\\}?';
+  const env = '\\$\\{?claude_plugin_data(?:[:\\-=?+][^}\\s"\']*)?\\}?';
   const re = new RegExp(`(--data(?:=|\\s+)["']?)?(?:${[...roots, spelled, env].join('|')})${TOKEN_END}([^\\s"';|&()<>]*)`, 'gi');
   for (const m of c.matchAll(re)) {
     const rest = m[2];
-    const inside = /^[\\/]+[^\\/*?[{.]/.test(rest) && !/[*?[{]/.test(rest) && !/[\\/]\.\.?(?=[\\/]|$)/.test(rest);
+    // Changing into the folder, or into one inside it (cd, pushd, tar -C), lets relative paths reach the rest.
+    if (!m[1] && /(?:\bcd|\bpushd|(?:^|\s)-C|--directory)[=\s]*["']?$/.test(c.slice(0, m.index))) return true;
+    const inside = /^[\\/]+[^\\/*?[{.]/.test(rest) && !/[*?[{]/.test(rest) && !/[\\/]\.\.?(?=[\\/]|$)/.test(rest)
+      && !/^[\\/]+(?:secret|state)(?:[\\/]|$)/i.test(rest);
     if (!inside && !(m[1] && rest === '')) return true;
   }
   return false;
 }
 
-function judgeFiles(cfg, tool, input) {
+// The plugin's own files: its guard, hooks, manifest, MCP servers and the script that starts them.
+// Changing any of them changes what the guard enforces, so the agent does not write them.
+const PLUGIN_OWN = ['guard', 'hooks', '.claude-plugin', '.mcp.json', path.join('scripts', 'mcp-server.mjs'), path.join('scripts', 'common.mjs')];
+const OWN_DENY = 'the plugin\'s own guard, hooks and server files are not changed by the agent. Read them with the Read tool.';
+
+function judgeFiles(cfg, tool, input, cwd) {
+  const writes = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
+  if (cfg.root && writes.has(tool)) {
+    for (const k of PATH_KEYS) {
+      if (typeof input[k] === 'string' && input[k] && isWithin(norm(input[k]), norm(cfg.root))) return out('deny', OWN_DENY);
+    }
+  }
+  if (cfg.root && SHELL_TOOLS.has(tool) && typeof input.command === 'string') {
+    const c = process.platform === 'win32' ? input.command.toLowerCase() : input.command;
+    const own = [...new Set([cfg.root, norm(cfg.root)])].flatMap((r) => PLUGIN_OWN.map((f) => path.join(r, f)));
+    if (own.some((f) => c.includes(process.platform === 'win32' ? f.toLowerCase() : f))) return out('deny', OWN_DENY);
+  }
   if (!cfg.data) return null;
   const protectedRoots = [cfg.secretDir, cfg.stateDir].map(norm);
-  const inside = (p, root) => p === root || p.startsWith(root + path.sep);
 
   if (FILE_TOOLS.has(tool)) {
-    for (const k of PATH_KEYS) {
-      if (typeof input[k] !== 'string' || !input[k]) continue;
-      const p = norm(input[k]);
+    const targets = PATH_KEYS.map((k) => input[k]).filter((v) => typeof v === 'string' && v);
+    // A search with no path runs in the session's folder, which may be above the data folder.
+    if ((tool === 'Grep' || tool === 'Glob') && !targets.length && typeof cwd === 'string' && cwd) targets.push(cwd);
+    for (const t of targets) {
+      const p = norm(t);
       // A target inside a protected dir, or a search rooted above one (Grep/Glob recurse).
-      const hit = protectedRoots.some((root) => inside(p, root) || ((tool === 'Grep' || tool === 'Glob') && inside(root, p)));
+      const hit = protectedRoots.some((root) => isWithin(p, root) || ((tool === 'Grep' || tool === 'Glob') && isWithin(root, p)));
       if (hit) return out('deny', SECRET_DENY);
     }
   }
   if (SHELL_TOOLS.has(tool) && typeof input.command === 'string') {
     const c = process.platform === 'win32' ? input.command.toLowerCase() : input.command;
+    // Paths as the data-folder rules read them: "/./" and repeated slashes are the same folder.
+    const cp = c.replace(/[\\/]\.(?=[\\/])/g, '').replace(/([\\/])[\\/]+/g, '$1');
     const markers = [...protectedRoots, 'library-state', 'login-raw', STATE_FILE].filter(Boolean);
     // Also catch the data dir spelled another way (~, $HOME, a relative path).
     const spelled = new RegExp(`plugins[\\\\/]+data[\\\\/]+[^\\\\/\\s"']*${PLUGIN}[^\\\\/\\s"']*[\\\\/]+(secret|state)(?![\\w-])`, 'i');
-    if (markers.some((m) => c.includes(m)) || spelled.test(c)) {
+    if (markers.some((m) => cp.includes(m)) || spelled.test(cp)) {
       return out('deny', 'shell access to the saved library login or the guard state is blocked.');
     }
-    if (namesDataDir(cfg, c)) {
+    if (namesDataDir(cfg, cp)) {
       return out('deny', 'this command takes the plugin\'s data directory as a whole (grep -r, tar, cp -r, cd, a glob), which holds the saved library login. Name a path inside it, such as downloads/library/<file>.');
     }
-    if (cfg.suffix && cfg.mode === 'ezproxy-host' && c.includes('.' + cfg.suffix)) {
+    // A proxied host, or the proxy itself, in any letter case and with or without a trailing dot.
+    const proxied = cfg.suffix && new RegExp(`(?:^|[^a-z0-9-])(?:[a-z0-9-]+\\.)*${escRe(cfg.suffix)}\\.?(?![a-z0-9-])`);
+    if (proxied && cfg.mode === 'ezproxy-host' && proxied.test(c.toLowerCase())) {
       return out('deny', 'proxied addresses are opened only by the library browser, where page loads are approved and counted.');
     }
     if (/scripts[\\/]+login\.mjs/.test(c)) {
@@ -634,7 +692,7 @@ function preToolUse(cfg, ev, now) {
     const shell = SHELL_TOOLS.has(tool) && typeof input.command === 'string';
     // A deny from the file rules outranks a Zotero ask; the Zotero shell rules then run even
     // when there is no plugin data directory to protect.
-    return judgeZotero(cfg, tool, input) || judgeFiles(cfg, tool, input) || (shell ? judgeZoteroShell(input.command) : null);
+    return judgeZotero(cfg, tool, input) || judgeFiles(cfg, tool, input, ev.cwd) || (shell ? judgeZoteroShell(input.command) : null);
   } catch {
     return null;
   }
@@ -671,8 +729,10 @@ function postToolUse(cfg, ev, now) {
     let res = null;
     if (stop) {
       const batch = activeBatch(cfg);
-      const approval = batch && findApproval(st, batch, now);
-      if (approval) approval.stopped = stop;
+      // Every approval that covers any of these papers stops, so another one cannot carry the batch on.
+      for (const a of st.approvals) {
+        if (!a.stopped && batch && a.targets.some((t) => batch.targets.includes(t))) a.stopped = stop;
+      }
       if (clickedOn && st.clickSites) delete st.clickSites[clickedOn];  // a learned click site loses its trust
       const msg = `lit-fetch-ladder stopped the batch${batch ? ` "${batch.name}"` : ''}: ${stop}`;
       res = { decision: 'block', reason: `${msg} Stop fetching and tell the user; the next page load in the logged-in browser asks them.`, systemMessage: msg };
@@ -684,11 +744,16 @@ function postToolUse(cfg, ev, now) {
 
 // The files a Playwright MCP result says a call started downloading. A download that
 // finishes later is reported again ("Downloaded file ...") in a later result, which is
-// not counted, so only the starts are read.
+// not counted, so only the starts are read. Each start counts, also when publishers give
+// every file the same name.
 const ARCHIVE_RE = /\.(zip|tar|tgz|gz|bz2|xz|7z|rar)$/i;
 export function downloads(resp) {
-  return [...new Set([...responseText(resp).matchAll(/^- Downloading file (.+?) \.\.\.\s*$/gm)].map((x) => x[1]))];
+  return [...responseText(resp).matchAll(/^- Downloading file (.+?) \.\.\.\s*$/gm)].map((x) => x[1]);
 }
+
+// The addresses a result says the browser is on: only lines that begin with "- Page URL:", which a
+// page's title or text cannot produce. The first is the current page.
+const PAGE_URL_RE = /^- Page URL: (https?:\/\/\S+)\s*$/gm;
 
 function recordNavigation(cfg, st, ev, tool, input, now) {
   const p = st.pending;
@@ -708,15 +773,14 @@ function recordNavigation(cfg, st, ev, tool, input, now) {
   const requested = navigationUrl(tool, input);
   if (approval && requested) {
     const fromSite = targetSite(cfg, requested);
-    const landed = [...JSON.stringify(ev.tool_response || '').matchAll(/Page URL: (https?:\/\/[^\s"\\]+)/g)].map((x) => x[1]);
+    const landed = [...responseText(ev.tool_response).matchAll(PAGE_URL_RE)].map((x) => x[1]);
     for (const u of landed) {
       const site = targetSite(cfg, u);
       if (site && !approval.sites.includes(site)) (approval.redirected ||= {})[site] = fromSite;
     }
   }
-  if (requested) {  // the site the browser is now on: the last page it landed on
-    const landedLast = [...JSON.stringify(ev.tool_response || '').matchAll(/Page URL: (https?:\/\/[^\s"\\]+)/g)].pop();
-    st.lastSite = targetSite(cfg, landedLast ? landedLast[1] : requested) || st.lastSite;
+  if (requested) {  // the site the browser is now on: the page the result says it landed on
+    st.lastSite = targetSite(cfg, pageState(ev.tool_response).url || requested) || st.lastSite;
   }
 }
 
@@ -761,7 +825,7 @@ export function pageState(resp) {
   const text = responseText(resp);
   const tabs = [...text.matchAll(/^- \d+: (\(current\) )?\[.*\]\((\S+)\)\s*$/gm)];
   const current = tabs.find((t) => t[1]);
-  const shown = [...text.matchAll(/Page URL: (https?:\/\/[^\s"\\]+)/g)].pop();
+  const shown = [...text.matchAll(PAGE_URL_RE)][0];
   const url = shown ? shown[1] : (current ? current[2] : null);
   return { url, tabs: tabs.length || (url ? 1 : 0) };
 }

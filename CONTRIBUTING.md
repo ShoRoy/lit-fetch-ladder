@@ -49,7 +49,7 @@ at start, so restart it after changing `hooks/hooks.json`. The README's figures 
 ## How the guard is changed
 
 Only the author changes the guard (`guard/guard.mjs`), and these are the rules an idea for it is held
-to. Each change comes with a test in `tests/guard.test.mjs` that fails before it and passes after, keeps
+to. The guard refuses the agent's edits to its own files, so disable the plugin while editing them. Each change comes with a test in `tests/guard.test.mjs` that fails before it and passes after, keeps
 the red-team replay in `tests/redteam/` passing, and never raises the page-load limits or removes a
 check. An entry in `guard/known-sites.json` widens what one approval covers: a known redirect is added
 only when seen in a real run, and a click site only for a publisher's own journal platform. The Python

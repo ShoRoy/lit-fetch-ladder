@@ -175,6 +175,14 @@ def report(manifest, mpath, pages_per_paper=DEFAULT_PAGES_PER_PAPER):
                "EXCLUDED", "UNRESOLVED", "ERROR"):
         if counts.get(st):
             lines.append("  %-13s %d" % (st, counts[st]))
+    landing = [i for i in manifest["items"] if i.get("state") == "OA_LANDING" and i.get("url")]
+    if landing:
+        lines.append("\n%d paper(s) have an open copy on a landing page, for the browser without a login (rung 2):"
+                     % len(landing))
+        for i in landing[:8]:
+            lines.append("  - %s -> %s" % (i["doi"], i["url"]))
+        if len(landing) > 8:
+            lines.append("  ... and %d more (see the manifest)" % (len(landing) - 8))
     todo = staged(manifest)
     if todo:
         need = len(todo) * pages_per_paper
@@ -182,7 +190,8 @@ def report(manifest, mpath, pages_per_paper=DEFAULT_PAGES_PER_PAPER):
         if need > DAILY_CAP:
             lines.append("  This can exceed the %d authenticated page loads allowed per 24 h; split the batch." % DAILY_CAP)
         for i in todo[:8]:
-            lines.append("  - %s -> %s" % (i["doi"], i["auth_url"]))
+            lines.append("  - %s -> %s%s" % (i["doi"], i["auth_url"],
+                                         " (if rung 2 does not get it)" if i.get("state") == "OA_LANDING" else ""))
         if len(todo) > 8:
             lines.append("  ... and %d more (see the manifest)" % (len(todo) - 8))
     unchecked = [i for i in manifest["items"] if i.get("state") in ("OA_FETCHED", "PROXY_FETCHED")
