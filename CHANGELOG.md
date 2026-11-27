@@ -16,8 +16,9 @@
 - The batch report lists open copies on a landing page (rung 2) before the papers staged for the
   library, and says when inputs named the same paper and were merged into one row.
 - The browse and library servers exit 0 when Claude Code shuts them down.
-- The README's version badge is a fixed one, checked by a test against plugin.json; the live badge
-  from shields.io often failed to load on GitHub.
+- The README's version badge is served from the repository (`docs/assets/version.svg`, drawn by
+  `make_figures.py` from plugin.json and checked by a test); badges from shields.io often failed to
+  load on GitHub, a new version's badge most of all.
 - Guard, from a red-team pass before release: a file search from `/` or with no path above the data
   folder is refused; a page title can no longer pass for the page's address; downloads with one file
   name count as several; a manifest or batch pointer that is not a plain file fails closed instead of

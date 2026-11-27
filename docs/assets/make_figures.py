@@ -5,6 +5,7 @@
 Edit the layout or the labels here and rerun; the four SVG files beside this script are generated
 and should not be edited by hand.
 """
+import json
 import os
 from xml.sax.saxutils import escape
 
@@ -156,6 +157,18 @@ def logo(t):
     return "\n".join(o) + "\n"
 
 
+def version_badge(version):
+    """A flat "version | X" badge, served from this repository so no badge service has to answer."""
+    left, right = 51, 10 + 7 * len(version)
+    w = left + right
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="20" role="img" aria-label="version: {version}">'
+            f'<title>version: {version}</title><clipPath id="r"><rect width="{w}" height="20" rx="3"/></clipPath>'
+            f'<g clip-path="url(#r)"><rect width="{left}" height="20" fill="#555"/>'
+            f'<rect x="{left}" width="{right}" height="20" fill="#b45309"/></g>'
+            f'<g fill="#fff" text-anchor="middle" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11">'
+            f'<text x="{left / 2}" y="14">version</text><text x="{left + right / 2}" y="14">{version}</text></g></svg>\n')
+
+
 if __name__ == "__main__":
     for name, theme in THEMES.items():
         for stem, make in (("pipeline", pipeline), ("logo", logo)):
@@ -163,3 +176,8 @@ if __name__ == "__main__":
             with open(path, "w", encoding="utf-8") as f:
                 f.write(make(theme))
             print("wrote", os.path.relpath(path, os.path.dirname(os.path.dirname(HERE))))
+    with open(os.path.join(os.path.dirname(os.path.dirname(HERE)), ".claude-plugin", "plugin.json"), encoding="utf-8") as f:
+        version = json.load(f)["version"]
+    with open(os.path.join(HERE, "version.svg"), "w", encoding="utf-8") as f:
+        f.write(version_badge(version))
+    print("wrote docs/assets/version.svg")

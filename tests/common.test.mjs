@@ -187,5 +187,8 @@ test("the README's version badge names the plugin's version", () => {
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
   const version = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin', 'plugin.json'), 'utf8')).version;
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
-  assert.match(readme, new RegExp(`img\\.shields\\.io/badge/version-${version.replace(/\./g, '\\.')}-`), 'bump the badge with the version');
+  assert.match(readme, /docs\/assets\/version\.svg" alt="Version ([\d.]+)"/);
+  assert.equal(readme.match(/alt="Version ([\d.]+)"/)[1], version, 'bump the badge text with the version');
+  const svg = fs.readFileSync(path.join(root, 'docs', 'assets', 'version.svg'), 'utf8');
+  assert.match(svg, new RegExp(`aria-label="version: ${version.replace(/\./g, '\\.')}"`), 'run docs/assets/make_figures.py');
 });
