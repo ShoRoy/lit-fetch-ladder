@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ShoRoy/lit-fetch-ladder/releases"><img src="https://raw.githubusercontent.com/ShoRoy/lit-fetch-ladder/main/docs/assets/version.svg" alt="Version 0.2.5"></a>
+  <a href="https://github.com/ShoRoy/lit-fetch-ladder/releases"><img src="https://raw.githubusercontent.com/ShoRoy/lit-fetch-ladder/main/docs/assets/version.svg" alt="Version 0.2.6"></a>
   <a href="https://github.com/ShoRoy/lit-fetch-ladder/actions/workflows/tests.yml"><img src="https://github.com/ShoRoy/lit-fetch-ladder/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <img src="https://img.shields.io/badge/Claude%20Code-plugin-d97757" alt="Claude Code plugin">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/ShoRoy/lit-fetch-ladder?color=555" alt="MIT license"></a>

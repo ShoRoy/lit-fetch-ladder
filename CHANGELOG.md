@@ -1,7 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.2.6
 
+- The guard's protection of its own files now covers what decides its behaviour (guard, hooks,
+  manifest, browser configuration, scripts, skills and code) and leaves the docs, tests and changelog
+  open. Its refusal message and Safeguards say so.
 - README: check your library's terms, which may forbid automated downloading; and how to leave your
   library out.
 

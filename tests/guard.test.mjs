@@ -954,14 +954,21 @@ test('the data folder is refused behind "/./", by cd or tar -C into it, and by v
   assert.equal(run(sb, pre('Bash', { command: `ls ${d}/downloads/library` })).decision, 'none');
 });
 
-test("the plugin's own guard and hooks cannot be edited by the agent", () => {
+test("the plugin's guard, hooks, skills and code cannot be edited by the agent; its docs and tests can", () => {
   const sb = sandbox();
   const root = path.join(sb.root, 'plugin');
   fs.mkdirSync(path.join(root, 'guard'), { recursive: true });
   const env = { env: { ...sb.env, CLAUDE_PLUGIN_ROOT: root } };
   assert.equal(run(env, pre('Edit', { file_path: path.join(root, 'guard', 'known-sites.json'), old_string: 'a', new_string: 'b' })).decision, 'deny');
   assert.equal(run(env, pre('Write', { file_path: path.join(root, 'hooks', 'hooks.json'), content: '{}' })).decision, 'deny');
+  assert.equal(run(env, pre('Edit', { file_path: path.join(root, 'skills', 'fetch', 'SKILL.md'), old_string: 'a', new_string: 'b' })).decision, 'deny');
+  assert.equal(run(env, pre('Write', { file_path: path.join(root, 'scripts', 'doctor.mjs'), content: '' })).decision, 'deny');
+  assert.equal(run(env, pre('Write', { file_path: path.join(root, 'src', 'lit_fetch_ladder', 'net.py'), content: '' })).decision, 'deny');
   assert.equal(run(env, pre('Bash', { command: `sed -i s/a/b/ ${root}/guard/known-sites.json` })).decision, 'deny');
+  assert.equal(run(env, pre('Bash', { command: `sed -i s/a/b/ ${root}/skills/fetch/SKILL.md` })).decision, 'deny');
+  for (const f of ['README.md', path.join('docs', 'usage.md'), path.join('tests', 'x.test.mjs'), 'CHANGELOG.md']) {
+    assert.equal(run(env, pre('Write', { file_path: path.join(root, f), content: 'x' })).decision, 'none', f);
+  }
   assert.equal(run(env, pre('Read', { file_path: path.join(root, 'guard', 'known-sites.json') })).decision, 'none');  // reading is fine
   assert.equal(run(env, pre('Bash', { command: `node ${root}/scripts/doctor.mjs --preflight` })).decision, 'none');
   // Without CLAUDE_PLUGIN_ROOT the guard protects the folder it runs from.

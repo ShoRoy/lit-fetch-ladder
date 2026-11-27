@@ -31,7 +31,7 @@ commands in your own terminal. Weigh both when you choose the install scope.
 | run code in the browser, read cookies or storage, read raw request headers | denied in both browsers (`browser_evaluate`, `browser_run_code_unsafe`, cookie and storage tools, `browser_network_request`, `browser_file_upload`) |
 | open `file://` or any non-http(s) address | denied |
 | read the saved login | denied for the file tools (also a search from a folder above it, or through a symlinked folder), for shell commands that name it, and for shell commands that take the plugin's data directory as a whole or change into it; the guard also refuses it as a file for Zotero MCP's add and attach tools |
-| change the guard itself | the file tools cannot write the plugin's guard, hooks or server files, and shell commands that name them are refused |
+| change the guard itself | the file tools cannot write the installed plugin's guard, hooks, skills or code, and shell commands that name them are refused; its docs and tests stay open |
 | add papers to the batch | a batch that grows needs your approval again, and the prompt names the new papers and sites |
 | open another site in the library browser | you are asked, and the site joins the batch only if you say yes |
 | redirect the library browser to a site of its choosing | the site it lands on is not trusted, so opening it again asks, and the prompt names the redirect |

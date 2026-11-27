@@ -613,21 +613,26 @@ function namesDataDir(cfg, c) {
   return false;
 }
 
-// The plugin's own files: its guard, hooks, manifest, MCP servers and the script that starts them.
-// Changing any of them changes what the guard enforces, so the agent does not write them.
-const PLUGIN_OWN = ['guard', 'hooks', '.claude-plugin', '.mcp.json', path.join('scripts', 'mcp-server.mjs'), path.join('scripts', 'common.mjs')];
-const OWN_DENY = 'the plugin\'s own guard, hooks and server files are not changed by the agent. Read them with the Read tool.';
+// The plugin's files that decide what it does: the guard and its hooks, the manifest, the browsers'
+// configuration and launcher, the skills (the agent's instructions) and the code. The agent does not
+// write them; the docs, tests and changelog stay open. The skills run scripts/ and cli/ from the shell,
+// so the shell rule names the rest.
+const PLUGIN_CODE = ['guard', 'hooks', '.claude-plugin', '.mcp.json', 'scripts', 'skills', 'src', 'cli'];
+const PLUGIN_SHELL = ['guard', 'hooks', '.claude-plugin', '.mcp.json', path.join('scripts', 'mcp-server.mjs'),
+  path.join('scripts', 'common.mjs'), 'skills', 'src'];
+const OWN_DENY = 'the plugin\'s guard, hooks, skills and code are not changed by the agent. Read them with the Read tool.';
 
 function judgeFiles(cfg, tool, input, cwd) {
   const writes = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
   if (cfg.root && writes.has(tool)) {
+    const code = PLUGIN_CODE.map((f) => norm(path.join(cfg.root, f)));
     for (const k of PATH_KEYS) {
-      if (typeof input[k] === 'string' && input[k] && isWithin(norm(input[k]), norm(cfg.root))) return out('deny', OWN_DENY);
+      if (typeof input[k] === 'string' && input[k] && code.some((r) => isWithin(norm(input[k]), r))) return out('deny', OWN_DENY);
     }
   }
   if (cfg.root && SHELL_TOOLS.has(tool) && typeof input.command === 'string') {
     const c = process.platform === 'win32' ? input.command.toLowerCase() : input.command;
-    const own = [...new Set([cfg.root, norm(cfg.root)])].flatMap((r) => PLUGIN_OWN.map((f) => path.join(r, f)));
+    const own = [...new Set([cfg.root, norm(cfg.root)])].flatMap((r) => PLUGIN_SHELL.map((f) => path.join(r, f)));
     if (own.some((f) => c.includes(process.platform === 'win32' ? f.toLowerCase() : f))) return out('deny', OWN_DENY);
   }
   if (!cfg.data) return null;
