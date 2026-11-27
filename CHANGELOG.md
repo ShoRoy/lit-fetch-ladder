@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- README: check your library's terms, which may forbid automated downloading; and how to leave your
+  library out.
+
 ## 0.2.5
 
 - While the browser cannot start, the doctor and `--preflight` say to sign in once the browser starts,

@@ -153,8 +153,10 @@ Publishers watch for systematic downloading through library proxies, and the usu
 suspend the library's access for everyone at the institution, not only for the person who caused it.
 So the plugin goes open access first, asks you to approve each library batch, and caps the library
 browser's page loads (5 per paper, 20 per burst, 60 per 24 hours). Use it for your own
-research, on papers you name, with access your library already gives you. If you raise the limits or
-remove a safeguard, the consequences for you and your library are yours.
+research, on papers you name, with access your library already gives you. Some libraries' terms forbid
+automated downloading of any kind, so check yours. To leave your library out, keep the proxy empty and do
+not sign in; on a campus network or VPN, also decline the library batch prompt. If you raise the limits
+or remove a safeguard, the consequences for you and your library are yours.
 
 ## Documentation
 
