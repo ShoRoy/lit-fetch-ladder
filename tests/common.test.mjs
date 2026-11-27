@@ -174,9 +174,11 @@ test('doctor --preflight names each missing prerequisite with its fix, then the 
     fs.writeFileSync(chrome, '#!/bin/sh\necho "chrome: error while loading shared libraries: libnspr4.so" >&2\nexit 127\n', { mode: 0o755 });
     r = run();
     assert.match(r.stdout, /^MISSING the browser's system libraries \(chrome does not start: .*libnspr4\.so\): run .*install-deps chromium, which needs root once/m);
+    assert.match(r.stdout, /^library login: NEEDED, none saved\. Sign in with \/lit-fetch-ladder:login once the browser starts\./m);
     fs.writeFileSync(chrome, '#!/bin/sh\necho "Chrome 151"\n', { mode: 0o755 });
     r = run();
     assert.doesNotMatch(r.stdout, /MISSING the browser|only open-access/);
+    assert.match(r.stdout, /^library login: NEEDED, none saved\. Sign in with \/lit-fetch-ladder:login\.$/m);
   }
   fs.rmSync(home, { recursive: true, force: true });
 });

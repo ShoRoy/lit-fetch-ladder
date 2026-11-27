@@ -26,13 +26,14 @@ const LOGIN_MAX_HOURS = 12;
 const win = process.platform === 'win32';
 
 // Whether a library sign-in is needed now: one line, and no network.
-function loginStatus() {
+function loginStatus(browserOk = true) {
+  const how = browserOk ? 'Sign in with /lit-fetch-ladder:login.' : 'Sign in with /lit-fetch-ladder:login once the browser starts.';
   const sess = suffix && data && path.join(data, ...SESSION_FILE);
   const hours = sess && fs.existsSync(sess) ? (Date.now() - fs.statSync(sess).mtimeMs) / 3600000 : -1;
   const needed = !!suffix && (hours < 0 || hours >= LOGIN_MAX_HOURS);
   if (!suffix) return { needed, line: 'library login: not needed (no library proxy set)' };
-  if (hours < 0) return { needed, line: 'library login: NEEDED, none saved. Sign in with /lit-fetch-ladder:login.' };
-  if (needed) return { needed, line: `library login: NEEDED, saved ${hours.toFixed(1)} h ago and probably expired. Sign in with /lit-fetch-ladder:login.` };
+  if (hours < 0) return { needed, line: `library login: NEEDED, none saved. ${how}` };
+  if (needed) return { needed, line: `library login: NEEDED, saved ${hours.toFixed(1)} h ago and probably expired. ${how}` };
   return { needed, line: `library login: saved ${hours.toFixed(1)} h ago` };
 }
 
@@ -68,7 +69,7 @@ if (process.argv.includes('--preflight')) {
   if (!p.pdftotext) missing.push('pdftotext: install poppler-utils, or fetched PDFs stay unconfirmed and are not filed');
   for (const m of missing) console.log(`MISSING ${m}`);
   if (!p.npx || !p.chromium || p.startProblem) console.log('Until the browser works, only open-access copies can be fetched (rungs 0 and 1).');
-  const login = loginStatus();
+  const login = loginStatus(p.npx && p.chromium && !p.startProblem);
   console.log(login.line);
   process.exit(missing.length || login.needed ? 1 : 0);
 }
@@ -130,10 +131,10 @@ if (!suffix) {
     const st = fs.statSync(sess);
     const hours = (Date.now() - st.mtimeMs) / 3600000;
     const privateFile = process.platform === 'win32' || (st.mode & 0o077) === 0;
-    check(hours < LOGIN_MAX_HOURS, `saved library login: ${hours.toFixed(1)} h old`, 'probably expired; run /lit-fetch-ladder:login');
+    check(hours < LOGIN_MAX_HOURS, `saved library login: ${hours.toFixed(1)} h old`, pre.chromium && !pre.startProblem ? 'probably expired; run /lit-fetch-ladder:login' : 'probably expired; run /lit-fetch-ladder:login once the browser starts (above)');
     check(privateFile, 'saved login readable only by you', `chmod 600 "${sess}"`);
   } else {
-    check(false, 'saved library login', data ? 'run /lit-fetch-ladder:login (the login opens a browser window)'
+    check(false, 'saved library login', data ? (pre.chromium && !pre.startProblem ? 'run /lit-fetch-ladder:login (the login opens a browser window)' : 'run /lit-fetch-ladder:login once the browser starts (above)')
       : 'no plugin data directory found; pass --data <dir> (Claude Code sets it when it runs the doctor)');
   }
   if (data) note(`plugin data: ${data}`);

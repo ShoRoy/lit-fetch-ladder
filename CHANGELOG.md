@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- While the browser cannot start, the doctor and `--preflight` say to sign in once the browser starts,
+  instead of pointing at a sign-in that cannot open a window yet.
+
 ## 0.2.4
 
 - Fewer questions. A fetch no longer checks anything up front. Only when open access leaves papers for
