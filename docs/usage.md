@@ -94,6 +94,16 @@ watch for. The "publisher does not download" issue form collects such sites.
 Each library pays for its own set of journals. A paper your library does not cover shows a purchase or
 "get access" page, and the agent marks it `ABSTRACT_ONLY` with a note.
 
+## If the browsers do not start
+
+- **Missing system libraries** (a server, WSL, Docker): the doctor names the library, and
+  `npx -y -p @playwright/mcp@0.0.78 playwright install-deps chromium` installs them, as root, once.
+  Without root, only open-access copies can be fetched there.
+- **Node installed after the plugin**: restart Claude Code and reconnect the two lit-fetch-ladder
+  servers in `/mcp`, or wait 15 minutes. Claude Code's message names `stdio`, not Node.
+
+A fetch does not stop for these: the papers stay staged, and the report ends with the fix.
+
 ## Without Claude Code
 
 Rungs 0 and 1 and the manifest work on their own, with no dependencies beyond Python 3.9.

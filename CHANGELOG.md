@@ -4,6 +4,9 @@
 
 - While the browser cannot start, the doctor and `--preflight` say to sign in once the browser starts,
   instead of pointing at a sign-in that cannot open a window yet.
+- Docs: the Quick start is shorter again. The requirements table keeps one column of reasons, and what
+  to do when the browsers do not start (missing libraries, Node installed after the plugin) moved to
+  Fetching papers.
 
 ## 0.2.4
 

@@ -86,17 +86,13 @@ as one pipeline. Without Zotero MCP the plugin fetches as usual. See [Filing int
 
 **Before you install**, have these on the machine where Claude Code runs. Tested on Linux.
 
-| Needed | Why | On Ubuntu |
-|---|---|---|
-| Claude Code 2.1.271 or later | runs the plugin | |
-| Node 18 or later, with npx | the guard and both browsers run on it; install it before the plugin | nodejs.org (on Ubuntu 24.04, `sudo apt install nodejs npm`) |
-| Python 3.9 or later | the fetch tools | `sudo apt install python3` |
-| poppler-utils | checks each PDF against its paper, and lets Claude Code read PDFs; without it a PDF stays unconfirmed and is not filed | `sudo apt install poppler-utils` |
-| root, once, on a server, WSL or Docker | the browser's system libraries (step 3) | |
-
-A fetch asks about none of this up front. When a batch has papers that open access did not cover, it
-checks the browser and your library login, asks you at most once, and ends its report with the fix for
-anything missing.
+| Needed | For |
+|---|---|
+| Claude Code 2.1.271 or later | the plugin |
+| Node 18 or later with npx, installed before the plugin (Ubuntu 22.04's own is too old) | the guard and the browsers |
+| Python 3.9 or later | the fetch tools |
+| poppler-utils | checking and reading PDFs; without it nothing is filed |
+| root once, on a server, WSL or Docker | the browser's system libraries (step 3) |
 
 **1. Install.** Start Claude Code in the folder you use for literature surveys and run
 
@@ -111,9 +107,9 @@ When asked where to install, choose the scope that suits you:
 - **Install for you, in this repo only (local scope)** loads them only in this folder (in VS Code,
   **Install locally**).
 
-Wherever it loads, the guard runs before every file, shell and web tool call and refuses a few shell
-commands ([what that costs](docs/safeguards.md#what-the-guard-costs)). From a shell, the same install is
-`claude plugin install lit-fetch-ladder@fetch-ladder --scope user`, or `--scope local`.
+Wherever it loads, the guard checks every file, shell and web tool call
+([what that costs](docs/safeguards.md#what-the-guard-costs)). From a shell:
+`claude plugin install lit-fetch-ladder@fetch-ladder --scope user` (or `local`).
 
 **2. Enter the two settings** Claude Code asks for (after an install from a shell, run
 `/plugin configure lit-fetch-ladder@fetch-ladder`). Your email is required by Unpaywall. For the library
@@ -126,12 +122,8 @@ campus network or library VPN.
 npx -y -p @playwright/mcp@0.0.78 playwright install chromium
 ```
 
-On a minimal Linux (an Ubuntu server, WSL, a Docker image) the browser may also need system libraries:
-`npx -y -p @playwright/mcp@0.0.78 playwright install-deps chromium` installs them, and the doctor says
-when that is needed. It needs root once (sudo); without root, the browsers and the sign-in cannot run
-there, and only open-access copies can be fetched. If Node came after the plugin, restart Claude Code,
-open `/mcp` and reconnect the two lit-fetch-ladder servers; otherwise Claude Code waits 15 minutes
-before it tries them again (its message names `stdio`, not Node).
+On a server, WSL or Docker, also run `npx -y -p @playwright/mcp@0.0.78 playwright install-deps chromium`
+once, as root ([if the browsers do not start](docs/usage.md#if-the-browsers-do-not-start)).
 
 Then run `/lit-fetch-ladder:doctor` in Claude Code to check the setup. Third-party marketplaces do not
 update by default, and the guard is security code, so turn on auto-update for this marketplace in

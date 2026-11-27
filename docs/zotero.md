@@ -20,13 +20,12 @@ zotero-mcp setup --no-local --no-claude        # web route: API key, library ID,
 zotero-mcp install-skill --target claude        # in the folder where you use the plugin
 ```
 
-Zotero MCP needs Python 3.10+. It writes through the web API or to the running Zotero desktop. The web
-route, `--no-local`, works with any Zotero version and from a container, and asks for an API key, your
-library ID and WebDAV settings. Without `--no-local`, setup writes the desktop route, which can read but
-not write until you run `zotero-mcp authorize-local` and choose **Always Allow** in the dialog Zotero
-shows (Zotero 10 or newer, on the same machine). `--no-claude` skips the Claude Desktop configuration,
-which Claude Code does not use. The first line of a filing, and of `--dry-run`, says where files will go,
-or that nothing can be written yet. Use your personal library, not a group library. Filing works with Zotero MCP 0.15 or later. If you sync files
+Zotero MCP needs Python 3.10+. The web route (`--no-local`) works with any Zotero version, also from a
+container, and asks for an API key, your library ID and WebDAV settings. Plain `zotero-mcp setup` sets up
+the desktop route instead, which writes only after `zotero-mcp authorize-local` and **Always Allow** in
+Zotero (10 or newer, same machine). `--no-claude` skips the Claude Desktop configuration. A filing's
+first line says where files will go, or that nothing can be written yet. Use your personal library,
+not a group library. Filing works with Zotero MCP 0.15 or later. If you sync files
 over WebDAV, use 0.17.4 or later: earlier versions upload to Zotero Storage first (before 0.16) or give
 up on a WebDAV upload after 10 seconds. `/lit-fetch-ladder:doctor` reports whether `zotero-cli` is found.
 
