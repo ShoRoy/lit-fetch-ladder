@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.7
+
+- The fetch skill has a rule against shadow libraries such as Sci-Hub, so papers come from
+  open-access copies and through the user's library only. The rule names the legal places open copies
+  are hosted (publishers, preprint servers, repositories, authors' pages), so it does not narrow the
+  open route. Only the skill enforces it, and Safeguards says so.
+- README: the plugin fetches only from legal sources, and why.
+
 ## 0.2.6
 
 - The guard's protection of its own files now covers what decides its behaviour (guard, hooks,

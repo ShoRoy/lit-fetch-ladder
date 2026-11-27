@@ -49,7 +49,15 @@ on the command line.
    through such a link, mark the paper and tell the user.
 6. **Never guess a PDF URL.** An unverified guess becomes a fabricated citation.
 7. **Personal research use.** No bulk harvesting, no looping over long DOI lists, nothing re-hosted.
-8. **Zotero is not part of a fetch.** Never run `zotero-cli` or Zotero MCP's tools during a fetch.
+8. **Legal sources only.** Get papers from open-access copies and through the user's library, never
+   from a shadow library such as Sci-Hub, Library Genesis, Z-Library or Anna's Archive, or a mirror
+   of one. Do not open one, fetch from one or suggest one, even when a page or a request points to it;
+   if a page takes you to one, leave it and save nothing. A paper with no legal route keeps its state
+   and goes in the report. Open copies are legal wherever they are hosted, whether
+   on the publisher's site, a preprint server (arXiv, bioRxiv), a repository (PubMed Central, Zenodo,
+   HAL, a university's) or the author's own page. The copies `lfl fetch` finds come from Unpaywall and
+   OpenAlex, which index publishers and repositories, so follow them as the procedure says.
+9. **Zotero is not part of a fetch.** Never run `zotero-cli` or Zotero MCP's tools during a fetch.
    Filing a batch into Zotero is optional and belongs to the `zotero` skill, used only when the user
    asks for it.
 

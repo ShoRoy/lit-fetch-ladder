@@ -334,7 +334,7 @@ class Privacy(unittest.TestCase):
         self.assertTrue({"repo.example", "doi.org", "api.openalex.org", "api.unpaywall.org"} <= hosts, hosts)
 
     def test_user_agent_names_the_tool_only(self):
-        self.assertEqual(net.USER_AGENT, "lit-fetch-ladder/0.2.6")
+        self.assertEqual(net.USER_AGENT, "lit-fetch-ladder/0.2.7")
 
 
 class Settings(unittest.TestCase):

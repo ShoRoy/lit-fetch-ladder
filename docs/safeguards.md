@@ -84,6 +84,8 @@ tells a restricted item from any other.
 - A site approved by mistake stays allowed in batches that include the site it follows, until you forget
   it with `/lit-fetch-ladder:sites`.
 - A tokenised download link on a site that is not proxied is refused only by the fetch skill's rule.
+- Shadow libraries such as Sci-Hub are kept out only by the fetch skill's rule. The guard does not
+  block them.
 - Without Node neither the guard nor the browsers run. If the guard fails while judging a file, shell or
   Zotero call, the call goes ahead. Only browser calls fail closed.
 

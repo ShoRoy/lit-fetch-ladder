@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ShoRoy/lit-fetch-ladder/releases"><img src="https://raw.githubusercontent.com/ShoRoy/lit-fetch-ladder/main/docs/assets/version.svg" alt="Version 0.2.6"></a>
+  <a href="https://github.com/ShoRoy/lit-fetch-ladder/releases"><img src="https://raw.githubusercontent.com/ShoRoy/lit-fetch-ladder/main/docs/assets/version.svg" alt="Version 0.2.7"></a>
   <a href="https://github.com/ShoRoy/lit-fetch-ladder/actions/workflows/tests.yml"><img src="https://github.com/ShoRoy/lit-fetch-ladder/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <img src="https://img.shields.io/badge/Claude%20Code-plugin-d97757" alt="Claude Code plugin">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/ShoRoy/lit-fetch-ladder?color=555" alt="MIT license"></a>
@@ -148,6 +148,11 @@ Sign in to the window it opens; only the proxy's cookies and site storage are sa
 [Filing into Zotero](docs/zotero.md).
 
 ## Use it responsibly
+
+The plugin is designed to fetch only from legal sources, open-access copies and what your library
+already gives you, and never from shadow libraries such as Sci-Hub. The author supports open access to
+the scientific literature, but sees it as a goal for systemic change, not a reason to get around
+paywalls.
 
 Publishers watch for systematic downloading through library proxies, and the usual response is to
 suspend the library's access for everyone at the institution, not only for the person who caused it.
